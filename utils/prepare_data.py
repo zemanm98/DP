@@ -8,53 +8,6 @@ from torch import nn
 from torch import optim
 from torch.nn import functional as F
 
-############################################ LOAD W2V EMBEDDING ###############################################
-def load_w2v(embedding_dim, embedding_dim_pos, train_file_path, embedding_path):
-    print('\nload embedding...')
-
-    words = []
-    inputFile1 = open(train_file_path, 'r', encoding="utf-8")
-    for line in inputFile1.readlines():
-        line = line.strip().split(';')
-        emotion, clause = line[1], line[-1]
-        words.extend(emotion.lower().split() + clause.lower().split())
-        # words extended by ['happy','the','thief','was','caught']
-
-    words = set(words) # Collection of all unique words
-    word_idx = dict((c, k + 1) for k, c in enumerate(words)) # Each word and its position
-    word_idx_rev = dict((k + 1, c) for k, c in enumerate(words)) # Each word and its position
-
-    w2v = {}
-    inputFile2 = open(embedding_path, 'r')
-    inputFile2.readline()
-    for line in inputFile2.readlines():
-        line = line.strip().split(' ')
-        w, ebd = line[0], line[1:]
-        w2v[w] = ebd
-
-    embedding = [list(np.zeros(embedding_dim))]
-    hit = 0
-    for item in words:
-        if item in w2v:
-            vec = list(map(float, w2v[item]))
-            hit += 1
-        else:
-            vec = list(np.random.rand(embedding_dim) / 5. - 0.1) 
-            # Randomly take from the uniform distribution [-0.1, 0.1]
-        embedding.append(vec)
-    print('w2v_file: {}\nall_words: {} hit_words: {}'.format(embedding_path, len(words), hit))
-    # add a noisy embedding in the end for out of vocabulary words
-    embedding.extend([list(np.random.rand(embedding_dim) / 5. - 0.1)])
-
-    embedding_pos = [list(np.zeros(embedding_dim_pos))]
-    embedding_pos.extend([list(np.random.normal(loc=0.0, scale=0.1, size=embedding_dim_pos)) \
-        for i in range(200)])
-    embedding, embedding_pos = np.array(embedding), np.array(embedding_pos)
-    
-    print("embedding.shape: {} embedding_pos.shape: {}".format(embedding.shape, embedding_pos.shape))
-    print("load embedding done!\n")
-    return word_idx_rev, word_idx, embedding, embedding_pos
-
 ############################################ LOAD DATA PAIR STEP ##############################################
 def load_data_pair(input_file, word_idx, max_doc_len = 75, max_sen_len = 45):
     print('load data_file: {}'.format(input_file))
