@@ -1,0 +1,20 @@
+{
+  "CNN1D": {
+  "lr": 0.0001,
+  "batch_size": 32
+  },
+  "CNN2D": {
+    "lr": 0.0001,
+    "batch_size": 32
+  },
+  "NN": {
+    "lr": 0.0001,
+    "batch_size": 32
+  },
+  "LSTM": {
+    "lr": 0.0001,
+    "batch_size": 32
+  }
+}
+
+

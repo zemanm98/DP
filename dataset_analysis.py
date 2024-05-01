@@ -3,6 +3,48 @@ import os
 
 import nussl
 
+def iemocap_analysis():
+    text_transcriptions = {}
+    emotions = {
+        "ang": 0,
+        "hap": 0,
+        "exc": 0,
+        "sad": 0,
+        "fru": 0,
+        "fea": 0,
+        "sur": 0,
+        "neu": 0,
+        "dis": 0
+    }
+    iemocap_emotion_exclude = ["hap", "xxx", "oth", "fea", "sur", "dis"]
+    transcriptions = os.listdir("IEMOCAP/transcription")
+    for f in transcriptions:
+        transcription = open("IEMOCAP/transcription/" + f).readlines()
+        for line in transcription:
+            inf = line.split(":")
+            if inf[0] not in text_transcriptions:
+                text_transcriptions[inf[0].split()[0]] = inf[1]
+
+    emotion_files = os.listdir("IEMOCAP/emotions")
+    iemocap_data = []
+    for f in emotion_files:
+        dialogue = open("IEMOCAP/emotions/" + f).readlines()
+        relevant_lines = []
+        for line in dialogue:
+            if line[0] == "[":
+                relevant_lines.append(line)
+        for relevant_line in relevant_lines:
+            emotion_record = relevant_line.split("\t")
+            if emotion_record[2] not in iemocap_emotion_exclude:
+                filename = emotion_record[1] + ".wav"
+                emotion = emotion_record[2]
+                emotions[emotion] += 1
+                text = text_transcriptions[emotion_record[1]].strip()
+                iemocap_data.append({"filename": filename, "emotion": emotion, "text": text})
+
+    print("a")
+
+
 
 def audio_analysis():
     train_folder = "train"
@@ -88,5 +130,6 @@ def main():
 
 
 if __name__ == "__main__":
-    audio_analysis()
-    main()
+    iemocap_analysis()
+    # audio_analysis()
+    # main()

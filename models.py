@@ -3,68 +3,36 @@ from torch.nn import functional as F
 from transformers import AutoConfig, AutoModel
 
 
-class LSTM_extractor_w2v(torch.nn.Module):
-    def __init__(self):
-        super(LSTM_extractor_w2v, self).__init__()
-        self.bilstm = torch.nn.LSTM(50000, 1024, batch_first=True, bidirectional=True)
+class LSTM(torch.nn.Module):
+    def __init__(self, feature_method, dataset):
+        super(LSTM, self).__init__()
+        if feature_method == "collective_features":
+            self.bilstm = torch.nn.LSTM(312, 300, batch_first=True, bidirectional=True)
+        else:
+            self.bilstm = torch.nn.LSTM(50, 300, batch_first=True, bidirectional=True)
         self.dp = torch.nn.Dropout(p=0.3)
-        self.linear = torch.nn.Linear(2048, 512)
-        self.linear2 = torch.nn.Linear(512, 7)
-
-    def forward(self, x):
-        x_states, hidden_states = self.bilstm(x)
-        x = self.dp(x_states)
-        x = self.linear(x)
-        x = self.linear2(x)
-        return x, x_states
-
-
-class LSTM_extractor_old(torch.nn.Module):
-    def __init__(self):
-        super(LSTM_extractor_old, self).__init__()
-        self.bilstm = torch.nn.LSTM(312, 400, batch_first=True, bidirectional=True)
-        self.dp = torch.nn.Dropout(p=0.3)
-        self.linear = torch.nn.Linear(800, 100)
+        self.linear = torch.nn.Linear(600, 50)
         self.relu = torch.nn.ReLU()
-        self.linear2 = torch.nn.Linear(100, 7)
+        if dataset == "ECF":
+            self.linear2 = torch.nn.Linear(50, 7)
+        elif dataset == "RAVDESS":
+            self.linear2 = torch.nn.Linear(50, 8)
+        else:
+            self.linear2 = torch.nn.Linear(50, 5)
 
     def forward(self, x):
         x_states, hidden_states = self.bilstm(x)
         x = x_states.squeeze()
         x = self.dp(x)
-        x = self.linear(x)
-        x = self.relu(x)
+        x_out = self.linear(x)
+        x = self.relu(x_out)
         x = self.linear2(x)
         x = F.softmax(x)
-        return x, x_states
-
-
-class LSTM_extractor(torch.nn.Module):
-    def __init__(self):
-        super(LSTM_extractor, self).__init__()
-        self.bilstm = torch.nn.LSTM(36, 300, batch_first=True, bidirectional=True)
-        self.dp = torch.nn.Dropout(p=0.3)
-        self.linear = torch.nn.Linear(600, 400)
-        self.linear2 = torch.nn.Linear(400, 150)
-        self.linear3 = torch.nn.Linear(150, 8)
-        self.relu = torch.nn.ReLU()
-
-    def forward(self, x):
-        x_states, hidden_states = self.bilstm(x)
-        # x = self.dp(x_states)
-        # out = x_states[:, -1]
-        out = torch.cat((x_states[:, -1, 300:], x_states[:, 0, :300]), 1)
-        x = F.relu(self.linear(out))
-        x = self.dp(x)
-        x = F.relu(self.linear2(x))
-        x = self.dp(x)
-        x = self.linear3(x)
-        # x = F.softmax(x)
-        return x, x_states
+        return x, x_out
 
 
 class ConvNet(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, feature_method, dataset):
         super(ConvNet, self).__init__()
         self.conv1 = torch.nn.Conv1d(1, 256, kernel_size=5, stride=1, padding=2)
         self.pool1 = torch.nn.MaxPool1d(kernel_size=5, stride=2, padding=2)
@@ -76,10 +44,18 @@ class ConvNet(torch.nn.Module):
         self.conv4 = torch.nn.Conv1d(128, 64, kernel_size=5, stride=1, padding=2)
         self.pool4 = torch.nn.MaxPool1d(kernel_size=5, stride=2, padding=2)
         self.flatten = torch.nn.Flatten()
-        self.fc1 = torch.nn.Linear(1280, 512)
+        if feature_method == "collective_features":
+            self.fc1 = torch.nn.Linear(1280, 512)
+        else:
+            self.fc1 = torch.nn.Linear(256, 512)
         self.dropout2 = torch.nn.Dropout(0.2)
-        self.fc2 = torch.nn.Linear(512, 100)
-        self.fc3 = torch.nn.Linear(100, 7)
+        self.fc2 = torch.nn.Linear(512, 50)
+        if dataset == "ECF":
+            self.fc3 = torch.nn.Linear(50, 7)
+        elif dataset == "RAVDESS":
+            self.fc3 = torch.nn.Linear(50, 8)
+        else:
+            self.fc3 = torch.nn.Linear(50, 5)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -101,13 +77,22 @@ class ConvNet(torch.nn.Module):
 
 
 class CNN_small(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, feature_method, dataset):
         super(CNN_small, self).__init__()
-        self.conv1 = torch.nn.Conv2d(1, 4, kernel_size=(3, 1))
+        self.conv1 = torch.nn.Conv2d(1, 2, kernel_size=(3, 1))
         self.pool1 = torch.nn.MaxPool2d(kernel_size=(296, 1))
-        self.conv2 = torch.nn.Conv2d(4, 8, kernel_size=(3, 1))
-        self.linear1 = torch.nn.Linear(400, 100)
-        self.linear2 = torch.nn.Linear(100, 7)
+        self.conv2 = torch.nn.Conv2d(2, 4, kernel_size=(3, 1))
+        if feature_method == "collective_features":
+            self.linear1 = torch.nn.Linear(808, 50)
+        else:
+            self.linear1 = torch.nn.Linear(200, 50)
+
+        if dataset == "ECF":
+            self.linear2 = torch.nn.Linear(50, 7)
+        elif dataset == "RAVDESS":
+            self.linear2 = torch.nn.Linear(50, 8)
+        else:
+            self.linear2 = torch.nn.Linear(50, 5)
         self.relu = torch.nn.ReLU()
         self.dropout = torch.nn.Dropout(0.15)
 
@@ -124,11 +109,19 @@ class CNN_small(torch.nn.Module):
 
 
 class simple_NN(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, feature_method, dataset):
         super(simple_NN, self).__init__()
-        self.linear1 = torch.nn.Linear(312, 840)
-        self.linear2 = torch.nn.Linear(840, 100)
-        self.linear3 = torch.nn.Linear(100, 7)
+        if feature_method == "collective_features":
+            self.linear1 = torch.nn.Linear(312, 512)
+        else:
+            self.linear1 = torch.nn.Linear(50, 512)
+        self.linear2 = torch.nn.Linear(512, 50)
+        if dataset == "ECF":
+            self.linear3 = torch.nn.Linear(50, 7)
+        elif dataset == "RAVDESS":
+            self.linear3 = torch.nn.Linear(50, 8)
+        else:
+            self.linear3 = torch.nn.Linear(50, 5)
         self.relu = torch.nn.ReLU()
         self.dropout = torch.nn.Dropout(0.15)
 
@@ -142,16 +135,26 @@ class simple_NN(torch.nn.Module):
 
 
 class LSTM_text_emotions(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, dataset, text_features, text_only):
         super(LSTM_text_emotions, self).__init__()
         self.n_hidden = 150
-        self.embedding_dim = 300
+        self.exclude_audio = text_only
+        if text_features == "w2v":
+            self.embedding_dim = 300
+        else:
+            self.embedding_dim = 768
         self.max_sen_len = 30
-        self.doc_len = 41
-        self.n_class = 7
+        if self.exclude_audio:
+            self.combined_input = 2 * self.n_hidden
+        else:
+            self.combined_input = 2 * self.n_hidden + 50
+        if dataset == "ECF":
+            self.n_class = 7
+        else:
+            self.n_class = 5
         self.droupout = torch.nn.Dropout(0.3)
         self.word_bilstm = torch.nn.LSTM(self.embedding_dim, self.n_hidden, batch_first=True, bidirectional=True)
-        self.pos_bilstm = torch.nn.LSTM(2 * self.n_hidden + 100, self.n_hidden, batch_first=True, bidirectional=True)
+        self.pos_bilstm = torch.nn.LSTM(self.combined_input, self.n_hidden, batch_first=True, bidirectional=True)
         # self.pos_bilstm = torch.nn.LSTM(2 * self.n_hidden, self.n_hidden, batch_first=True, bidirectional=True)
         self.linear = torch.nn.Linear(2 * self.n_hidden, self.n_class)
         self.attention = Attention(self.n_hidden, self.max_sen_len)
@@ -162,27 +165,40 @@ class LSTM_text_emotions(torch.nn.Module):
         x = self.droupout(x)
         s = self.attention(x)#.reshape(self.max_sen_len, 2 * self.n_hidden)
         # s = s.reshape(-1, self.doc_len, 2 * self.n_hidden)
-        x_context, hidden_states = self.pos_bilstm(torch.cat([s, audio], -1).float())
-        # x_context, hidden_states = self.pos_bilstm(s.float())
+        if self.exclude_audio:
+            x_context, hidden_states = self.pos_bilstm(s.float())
+        else:
+            x_context, hidden_states = self.pos_bilstm(torch.cat([s, audio], -1).float())
         x = x_context.reshape(-1, 2 * self.n_hidden)
         pred_pos = F.softmax(self.linear(x), dim=-1)
         # pred_pos = pred_pos.reshape(-1, self.doc_len, self.n_class)
         return pred_pos
 
 class CustomBert(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, dataset, text_only):
         super(CustomBert, self).__init__()
+        self.text_only = text_only
         self.config = AutoConfig.from_pretrained("bert-base-uncased")
         self.transformer = AutoModel.from_pretrained("bert-base-uncased", config=self.config)
         num_hidden_size = self.transformer.config.hidden_size
-        self.classifier = torch.nn.Linear(num_hidden_size + 25, 7)
-        # self.classifier = torch.nn.Linear(num_hidden_size, 7)
+        if dataset == "ECF":
+            self.n_class = 7
+        else:
+            self.n_class = 5
+
+        if text_only:
+            self.linear_input_size = num_hidden_size
+        else:
+            self.linear_input_size = num_hidden_size + 50
+
+        self.classifier = torch.nn.Linear(self.linear_input_size, self.n_class)
 
     def forward(self, input_ids, attention_masks, audio=None):
         hidden_states = self.transformer(input_ids=input_ids, attention_mask=attention_masks)
         concat = hidden_states.last_hidden_state[:, 0, :]
         # audio = audio.squeeze()
-        concat = torch.cat((concat, audio), dim=-1)
+        if not self.text_only:
+            concat = torch.cat((concat, audio), dim=-1)
         concat = concat.float()
         output = self.classifier(concat)
         return output
