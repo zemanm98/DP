@@ -5,8 +5,6 @@ from transformers import AutoConfig, AutoModel
 '''
 LSTM audio emotion recognition model
 '''
-
-
 class LSTM(torch.nn.Module):
     def __init__(self, feature_method, dataset):
         super(LSTM, self).__init__()
@@ -40,8 +38,6 @@ class LSTM(torch.nn.Module):
 '''
 CNN1D audio emotion recognition model
 '''
-
-
 class ConvNet(torch.nn.Module):
     def __init__(self, feature_method, dataset):
         super(ConvNet, self).__init__()
@@ -92,8 +88,6 @@ class ConvNet(torch.nn.Module):
 '''
 CNN2D audio emotion recognition model
 '''
-
-
 class CNN_small(torch.nn.Module):
     def __init__(self, feature_method, dataset):
         super(CNN_small, self).__init__()
@@ -131,8 +125,6 @@ class CNN_small(torch.nn.Module):
 '''
 NN audio emotion recognition model
 '''
-
-
 class simple_NN(torch.nn.Module):
     def __init__(self, feature_method, dataset):
         super(simple_NN, self).__init__()
@@ -164,8 +156,6 @@ class simple_NN(torch.nn.Module):
 '''
 LSTM text multimodal and textual emotion recognition model
 '''
-
-
 class LSTM_text_emotions(torch.nn.Module):
     def __init__(self, dataset, text_features, text_only):
         super(LSTM_text_emotions, self).__init__()
@@ -211,8 +201,6 @@ class LSTM_text_emotions(torch.nn.Module):
 '''
 BERT multimodal or textual model
 '''
-
-
 class CustomBert(torch.nn.Module):
     def __init__(self, dataset, text_only):
         super(CustomBert, self).__init__()
@@ -246,8 +234,6 @@ class CustomBert(torch.nn.Module):
 '''
 The Attention layer of the LSTM multimodal and textual model.
 '''
-
-
 class Attention(torch.nn.Module):
     def __init__(self, n_hidden, sen_len):
         super(Attention, self).__init__()

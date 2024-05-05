@@ -66,9 +66,6 @@ def text_training(text_model, audio_model, text_features, audio_features, datase
 
 
 def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
-    # preparing the config for the wandb logging
-    config = {"lr": LSTM_TEXT_LR, "batch_size": LSTM_TEXT_BATCH_SIZE, "model": "LSTM_text", "text_features": text_features,
-              "audio_model": audio_model, "audio_features": audio_features, "dataset": dataset, "text_only": text_only}
     model = LSTM_text_emotions(dataset, text_features, text_only)
     audio_model_name = audio_model + "_" + dataset + "_" + audio_features + ".pt"
     # if the audio feature extraction model does not exist, train it first
@@ -92,12 +89,6 @@ def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
         train_eval_step = 35
     else:
         train_eval_step = 18
-
-    # wandb run initialization
-    # wandb_run_name = "LSTM_text_" + text_features + "_" + dataset + "_" + audio_model + "_" + audio_features
-    # wandb.init(project="DP", entity="zeman339", name=wandb_run_name, config=config)
-    # wandb.define_metric("Steps")
-    # wandb.define_metric("*", step_metric="Steps")
 
     loader = DataLoader(list(zip(train_x, train_y, train_audio)), shuffle=True, batch_size=32)
     model.to(device)
@@ -133,7 +124,6 @@ def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
                 model.eval()
                 train_pred_y = model(tr_test_batch_x.to(device), tr_test_batch_a.to(device))
                 f1, acc = f1_acc(train_pred_y, tr_test_batch_y, dataset)
-                # wandb.log({"train_acc": acc, "train_f1": f1, "Steps": train_step_counter})
                 train_step_counter += 1
                 print("train acc: " + str(acc) + ";  train f1: " + str(f1) + ";  loss: " + str(loss))
                 tr_test_batch_x = None
@@ -146,14 +136,12 @@ def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
             test_step_counter += 1
             dev_pred_y = model(dev_x.to(device), dev_audio.to(device))
             f1, acc = f1_acc(dev_pred_y, dev_y, dataset)
-            # wandb.log({"val_acc": acc, "val_f1": f1, "Steps": test_step_counter})
             print("epoch: " + str(epoch) + "\nacc: " + str(acc) + "\nf1: " + str(f1) + "\n")
 
     with torch.no_grad():
         model.eval()
         test_pred_y = model(test_x.to(device), test_audio.to(device))
         f1, acc = f1_acc(test_pred_y, test_y, dataset)
-        # wandb.log({"test_acc": acc, "test_f1": f1, "Steps": 1})
         print("\ntest acc: " + str(acc) + "\ntest f1: " + str(f1) + "\n")
 
     if not os.path.exists("./text_models"):
@@ -162,9 +150,6 @@ def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
 
 
 def train_bert(audio_model, audio_feature, dataset, text_only):
-    # preparing config for the wandb logging
-    config = {"lr": BERT_LR, "batch_size": BERT_BATCH_SIZE, "model": "BERT",
-              "audio_model": audio_model, "audio_features": audio_feature, "dataset": dataset, "text_only": text_only}
     audio_model_name = audio_model + "_" + dataset + "_" + audio_feature + ".pt"
     if not os.path.isfile("mfcc_model/" + audio_model_name):
         print("Audio model save point not found. Audio model learning process begun.\n")
@@ -204,12 +189,6 @@ def train_bert(audio_model, audio_feature, dataset, text_only):
         test_eval_step = 5
     train_step_counter = 1
     test_step_counter = 1
-
-    # wandb run initialization
-    # wandb_run_name = "BERT_" + dataset + "_" + audio_model + "_" + audio_feature
-    # wandb.init(project="DP", entity="zeman339", name=wandb_run_name, config=config)
-    # wandb.define_metric("Steps")
-    # wandb.define_metric("*", step_metric="Steps")
 
     for epoch in range(1, epochs):
         custom_model.train()
@@ -254,7 +233,6 @@ def train_bert(audio_model, audio_feature, dataset, text_only):
                     total_eval_f1 += f1
                 avg_val_accuracy = total_eval_accuracy / len(train_test_loader)
                 avg_val_f1 = total_eval_f1 / len(train_test_loader)
-                # wandb.log({"train_acc": avg_val_accuracy, "train_f1": avg_val_f1, "Steps": train_step_counter})
                 train_step_counter += 1
                 print("train acc: " + str(avg_val_accuracy) + " f1: " + str(avg_val_f1) + " loss: " + str(loss))
                 train_test_inputs = None
@@ -278,7 +256,6 @@ def train_bert(audio_model, audio_feature, dataset, text_only):
                     total_eval_f1 += f1
                 avg_val_accuracy = total_eval_accuracy / len(dev_loader)
                 avg_val_f1 = total_eval_f1 / len(dev_loader)
-                # wandb.log({"val_acc": avg_val_accuracy, "val_f1": avg_val_f1, "Steps": test_step_counter})
                 test_step_counter += 1
                 print("epoch: " + str(epoch) + "\nacc: " + str(avg_val_accuracy) + "\nf1: " + str(avg_val_f1) + "\n")
 
@@ -297,7 +274,6 @@ def train_bert(audio_model, audio_feature, dataset, text_only):
         total_eval_f1 += f1
     avg_val_accuracy = total_eval_accuracy / len(test_loader)
     avg_val_f1 = total_eval_f1 / len(test_loader)
-    # wandb.log({"test_acc": avg_val_accuracy, "test_f1": avg_val_f1, "Steps": 1})
     print("test acc: " + str(avg_val_accuracy) + "\n test f1: " + str(avg_val_f1) + "\n")
     torch.save(custom_model.state_dict(), "text_models/BERT_" + dataset + "_" + audio_model + "_" + audio_feature +".pt")
 

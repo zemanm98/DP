@@ -362,6 +362,9 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
     Loading the multimodal data with the Word2vec text extraction method for the LSTM multimodal model.
     '''
     print("Loading dataset " + dataset + " for multimodal LSTM model with w2v embeddings.")
+    if len(dataset.split("_")) > 1:
+        noise_reduction_method = dataset.split("_")[1]
+        print("Noise reduction " + noise_reduction_method + " used.\n")
     train_folder = ECF_TRAIN_FOLDER + "/"
     test_folder = ECF_TEST_FOLDER + "/"
     trains = os.listdir(train_folder)
@@ -482,6 +485,9 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features):
     Loading the multimodal data with the BERT embeddings text extraction method for the LSTM multimodal model.
     '''
     print("Loading dataset " + dataset + " for multimodal LSTM model with BERT embeddings.")
+    if len(dataset.split("_")) > 1:
+        noise_reduction_method = dataset.split("_")[1]
+        print("Noise reduction " + noise_reduction_method + " used.\n")
     # determining the file path for the unchanged or the noise reduced ECF dataset
     train_folder = ECF_TRAIN_FOLDER + "/"
     test_folder = ECF_TEST_FOLDER + "/"
@@ -596,6 +602,9 @@ def load_data_for_bert(dataset, audio_model, audio_feature):
     Method prepares the training data for the pretrained BERT model.
     '''
     print("Loading dataset " + dataset + " for multimodal BERT model.")
+    if len(dataset.split("_")) > 1:
+        noise_reduction_method = dataset.split("_")[1]
+        print("Noise reduction " + noise_reduction_method + " used.\n")
     train_folder = ECF_TRAIN_FOLDER
     test_folder = ECF_TEST_FOLDER
     bert_tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", do_lower_case=True)
@@ -802,7 +811,6 @@ def get_audio_vector(audio_feature, model_name, filename, dataset):
     noise_reduction_method = None
     if len(dataset.split("_")) > 1:
         noise_reduction_method = dataset.split("_")[1]
-        print("Noise reduction " + noise_reduction_method + " used.\n")
     train_folder = ECF_TRAIN_FOLDER + "/"
     val_folder = ECF_DEV_FOLDER + "/"
     test_folder = ECF_TEST_FOLDER + "/"

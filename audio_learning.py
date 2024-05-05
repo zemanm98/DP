@@ -68,9 +68,6 @@ def audio_emotion_learn(model_name, dataset, feature_extraction):
     else:
         config["lr"] = NN_LR
         config["batch_size"] = NN_BATCH_SIZE
-    config["model"] = model_name
-    config["dataset"] = dataset
-    config["feature_extraction"] = feature_extraction
 
     model = initialize_model(model_name, feature_extraction, dataset)
 
