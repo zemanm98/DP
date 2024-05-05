@@ -42,7 +42,7 @@ def iemocap_analysis():
                 text = text_transcriptions[emotion_record[1]].strip()
                 iemocap_data.append({"filename": filename, "emotion": emotion, "text": text})
 
-    print("a")
+    print("done")
 
 
 

@@ -1,24 +1,31 @@
-import torch.nn
-import wandb
-from models import LSTM_text_emotions, CustomBert
-from dataset_loading import *
-from torch.utils.data import DataLoader
 import argparse
-from config.config import LSTM_text_lr, LSTM_text_batch_size, BERT_lr, BERT_batch_size
+
+import torch.nn
+from torch.utils.data import DataLoader
+
+import wandb
+from config.config import *
+from dataset_loading import *
+from models import LSTM_text_emotions, CustomBert
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-from utils.func import embedding_lookup, f1_acc, bert_accuracy
-from transformers import BertModel, BertForSequenceClassification, get_linear_schedule_with_warmup
+from utils.func import f1_acc
+from transformers import get_linear_schedule_with_warmup
 from torch.utils.data import TensorDataset
 from audio_learning import audio_emotion_learn
 
 
 def validate_input(text_model, audio_model, text_features, audio_features, dataset):
+    '''
+    Method validates the input parameters and exits if the parameters are used incorrectly
+    '''
     if dataset == "RAVDESS":
         print("RAVDESS does not have transcriptions, so only audio model learning will be deployed.\n")
-        exit(0)
+        return
 
-    if dataset not in ["ECF", "IEMOCAP", "RAVDESS"]:
-        print("Unknown dataset. Dataset choices are: ECF or IEMOCAP or RAVDESS\n")
+    if dataset not in ["ECF", "IEMOCAP", "RAVDESS", "ECF_FT2D", "ECF_REPETSIM"]:
+        print("Unknown dataset. Dataset choices are: ECF or IEMOCAP or RAVDESS. And if any noise reduction method\n"
+              "should be used on ECF dataset, its ECF_FT2D and ECF_REPETSIM\n")
         exit(0)
 
     if audio_features not in ["collective_features", "mfcc_only"]:
@@ -41,16 +48,15 @@ def validate_input(text_model, audio_model, text_features, audio_features, datas
     if text_model == "BERT" and text_features == "w2v":
         print(
             "BERT model is not capable of working with w2v feature extraction. BERT text feature extraction will be used.")
-
-
-def flat_accuracy(preds, labels):
-    pred_flat = np.argmax(preds, axis=1).flatten()
-    labels_flat = labels.flatten()
-    return np.sum(pred_flat == labels_flat) / len(labels_flat)
+        return
 
 
 def text_training(text_model, audio_model, text_features, audio_features, dataset, text_only):
+    # validating the input parameters
     validate_input(text_model, audio_model, text_features, audio_features, dataset)
+    print("Input parameters validated\nMultimodal model: " + text_model + "\nAudio model: " + audio_model +
+          "\nText features: " + text_features + "\nAudio features: " + audio_features + "\nDataset: " + dataset + "\n")
+    # The RAVDESS dataset does not have a text transcription so only audio learning is employed
     if dataset == "RAVDESS":
         audio_emotion_learn(audio_model, dataset, audio_features)
     else:
@@ -61,16 +67,19 @@ def text_training(text_model, audio_model, text_features, audio_features, datase
 
 
 def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
-    config = {"lr": LSTM_text_lr, "batch_size": LSTM_text_batch_size, "model": "LSTM_text", "text_features": text_features,
+    # preparing the config for the wandb logging
+    config = {"lr": LSTM_TEXT_LR, "batch_size": LSTM_TEXT_BATCH_SIZE, "model": "LSTM_text", "text_features": text_features,
               "audio_model": audio_model, "audio_features": audio_features, "dataset": dataset, "text_only": text_only}
     model = LSTM_text_emotions(dataset, text_features, text_only)
     audio_model_name = audio_model + "_" + dataset + "_" + audio_features + ".pt"
-    if not os.path.isfile("mfcc_model/" + audio_model_name):
+    # if the audio feature extraction model does not exist, train it first
+    if not os.path.isfile("audio_models/" + audio_model_name):
         print("Audio model save point not found. Audio model learning process begun.\n")
         audio_emotion_learn(audio_model, dataset, audio_features)
 
+    # using the specified text feature extraction method
     if text_features == "w2v":
-        word_id_mapping, word_embedding = load_w2v(300, "w2v/model.txt", dataset)
+        word_id_mapping, word_embedding = load_w2v(300, W2V_FILE_PATH, dataset)
         word_embedding = torch.from_numpy(word_embedding)
         train_x, train_y, test_x, test_y, dev_x, dev_y, train_audio, test_audio, dev_audio = load_text_data(
             word_id_mapping, word_embedding,
@@ -79,15 +88,17 @@ def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
         train_x, train_y, test_x, test_y, dev_x, dev_y, train_audio, test_audio, dev_audio =\
             load_text_data_bert(30, dataset, audio_model, audio_features)
 
-    if dataset == "ECF":
+    # train evaluation step interval for the wandb logging
+    if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
         train_eval_step = 35
     else:
         train_eval_step = 18
 
-    wandb_run_name = "LSTM_text_" + text_features + "_" + dataset + "_" + audio_model + "_" + audio_features
-    wandb.init(project="DP", entity="zeman339", name=wandb_run_name, config=config)
-    wandb.define_metric("Steps")
-    wandb.define_metric("*", step_metric="Steps")
+    # wandb run initialization
+    # wandb_run_name = "LSTM_text_" + text_features + "_" + dataset + "_" + audio_model + "_" + audio_features
+    # wandb.init(project="DP", entity="zeman339", name=wandb_run_name, config=config)
+    # wandb.define_metric("Steps")
+    # wandb.define_metric("*", step_metric="Steps")
 
     loader = DataLoader(list(zip(train_x, train_y, train_audio)), shuffle=True, batch_size=32)
     model.to(device)
@@ -104,6 +115,7 @@ def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
         for tr_x_batch, tr_y_batch, tr_batch_audio in loader:
             optimizer.zero_grad()
             tr_pred_y = model(tr_x_batch.to(device), tr_batch_audio.to(device))
+            # preparing the train evaluation dataset for train accuracy and train f1 score
             if tr_test_batch_x is None:
                 tr_test_batch_a = tr_batch_audio
                 tr_test_batch_x = tr_x_batch
@@ -122,7 +134,7 @@ def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
                 model.eval()
                 train_pred_y = model(tr_test_batch_x.to(device), tr_test_batch_a.to(device))
                 f1, acc = f1_acc(train_pred_y, tr_test_batch_y, dataset)
-                wandb.log({"train_acc": acc, "train_f1": f1, "Steps": train_step_counter})
+                # wandb.log({"train_acc": acc, "train_f1": f1, "Steps": train_step_counter})
                 train_step_counter += 1
                 print("train acc: " + str(acc) + ";  train f1: " + str(f1) + ";  loss: " + str(loss))
                 tr_test_batch_x = None
@@ -135,20 +147,21 @@ def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
             test_step_counter += 1
             dev_pred_y = model(dev_x.to(device), dev_audio.to(device))
             f1, acc = f1_acc(dev_pred_y, dev_y, dataset)
-            wandb.log({"val_acc": acc, "val_f1": f1, "Steps": test_step_counter})
+            # wandb.log({"val_acc": acc, "val_f1": f1, "Steps": test_step_counter})
             print("epoch: " + str(epoch) + "\nacc: " + str(acc) + "\nf1: " + str(f1) + "\n")
 
     with torch.no_grad():
         model.eval()
         test_pred_y = model(test_x.to(device), test_audio.to(device))
         f1, acc = f1_acc(test_pred_y, test_y, dataset)
-        wandb.log({"test_acc": acc, "test_f1": f1, "Steps": 1})
+        # wandb.log({"test_acc": acc, "test_f1": f1, "Steps": 1})
         print("\ntest acc: " + str(acc) + "\ntest f1: " + str(f1) + "\n")
-    torch.save(model.state_dict(), "text_model/LSTM_" + dataset + "_" + text_features + "_" + audio_model + "_" + audio_features + ".pt")
+    torch.save(model.state_dict(), "text_models/LSTM_" + dataset + "_" + text_features + "_" + audio_model + "_" + audio_features + ".pt")
 
 
 def train_bert(audio_model, audio_feature, dataset, text_only):
-    config = {"lr": BERT_lr, "batch_size": BERT_batch_size, "model": "BERT",
+    # preparing config for the wandb logging
+    config = {"lr": BERT_LR, "batch_size": BERT_BATCH_SIZE, "model": "BERT",
               "audio_model": audio_model, "audio_features": audio_feature, "dataset": dataset, "text_only": text_only}
     audio_model_name = audio_model + "_" + dataset + "_" + audio_feature + ".pt"
     if not os.path.isfile("mfcc_model/" + audio_model_name):
@@ -156,6 +169,7 @@ def train_bert(audio_model, audio_feature, dataset, text_only):
         audio_emotion_learn(audio_model, dataset, audio_feature)
 
     custom_model = CustomBert(dataset, text_only)
+    # loading the dataset data for the BERT model
     train_inputs, train_attention, train_labels, test_inputs, test_labels, \
     test_attention, dev_inputs, dev_attention, dev_labels, train_audio, test_audio, dev_audio = load_data_for_bert(dataset,
                                                                                                                    audio_model,
@@ -164,11 +178,11 @@ def train_bert(audio_model, audio_feature, dataset, text_only):
     test_dataset = TensorDataset(test_inputs, test_attention, test_labels, test_audio)
     dev_dataset = TensorDataset(dev_inputs, dev_attention, dev_labels, dev_audio)
 
-    loader = DataLoader(train_dataset, shuffle=True, batch_size=BERT_batch_size)
-    test_loader = DataLoader(test_dataset, shuffle=True, batch_size=BERT_batch_size)
-    dev_loader = DataLoader(dev_dataset, shuffle=True, batch_size=BERT_batch_size)
+    loader = DataLoader(train_dataset, shuffle=True, batch_size=BERT_BATCH_SIZE)
+    test_loader = DataLoader(test_dataset, shuffle=True, batch_size=BERT_BATCH_SIZE)
+    dev_loader = DataLoader(dev_dataset, shuffle=True, batch_size=BERT_BATCH_SIZE)
     custom_model.to(device)
-    optimizer = torch.optim.AdamW(custom_model.parameters(), lr=BERT_lr, eps=1e-8)
+    optimizer = torch.optim.AdamW(custom_model.parameters(), lr=BERT_LR, eps=1e-8)
     loss_f = torch.nn.MSELoss()
     epochs = 3
     total_steps = len(loader) * epochs
@@ -179,6 +193,7 @@ def train_bert(audio_model, audio_feature, dataset, text_only):
     train_test_att = None
     train_test_labels = None
     train_test_audio = None
+    # train evaluation step interval for the train accuracy and train f1 score
     if dataset == "ECF":
         train_eval_step = 4
         test_eval_step = 10
@@ -188,10 +203,11 @@ def train_bert(audio_model, audio_feature, dataset, text_only):
     train_step_counter = 1
     test_step_counter = 1
 
-    wandb_run_name = "BERT_" + dataset + "_" + audio_model + "_" + audio_feature
-    wandb.init(project="DP", entity="zeman339", name=wandb_run_name, config=config)
-    wandb.define_metric("Steps")
-    wandb.define_metric("*", step_metric="Steps")
+    # wandb run initialization
+    # wandb_run_name = "BERT_" + dataset + "_" + audio_model + "_" + audio_feature
+    # wandb.init(project="DP", entity="zeman339", name=wandb_run_name, config=config)
+    # wandb.define_metric("Steps")
+    # wandb.define_metric("*", step_metric="Steps")
 
     for epoch in range(1, epochs):
         custom_model.train()
@@ -221,7 +237,7 @@ def train_bert(audio_model, audio_feature, dataset, text_only):
             if counter % train_eval_step == 0:
                 custom_model.eval()
                 train_test_dataset = TensorDataset(train_test_inputs, train_test_att, train_test_labels, train_test_audio)
-                train_test_loader = DataLoader(train_test_dataset, shuffle=True, batch_size=BERT_batch_size)
+                train_test_loader = DataLoader(train_test_dataset, shuffle=True, batch_size=BERT_BATCH_SIZE)
                 total_eval_accuracy = 0
                 total_eval_f1 = 0
                 for batch in train_test_loader:
@@ -236,7 +252,7 @@ def train_bert(audio_model, audio_feature, dataset, text_only):
                     total_eval_f1 += f1
                 avg_val_accuracy = total_eval_accuracy / len(train_test_loader)
                 avg_val_f1 = total_eval_f1 / len(train_test_loader)
-                wandb.log({"train_acc": avg_val_accuracy, "train_f1": avg_val_f1, "Steps": train_step_counter})
+                # wandb.log({"train_acc": avg_val_accuracy, "train_f1": avg_val_f1, "Steps": train_step_counter})
                 train_step_counter += 1
                 print("train acc: " + str(avg_val_accuracy) + " f1: " + str(avg_val_f1) + " loss: " + str(loss))
                 train_test_inputs = None
@@ -260,7 +276,7 @@ def train_bert(audio_model, audio_feature, dataset, text_only):
                     total_eval_f1 += f1
                 avg_val_accuracy = total_eval_accuracy / len(dev_loader)
                 avg_val_f1 = total_eval_f1 / len(dev_loader)
-                wandb.log({"val_acc": avg_val_accuracy, "val_f1": avg_val_f1, "Steps": test_step_counter})
+                # wandb.log({"val_acc": avg_val_accuracy, "val_f1": avg_val_f1, "Steps": test_step_counter})
                 test_step_counter += 1
                 print("epoch: " + str(epoch) + "\nacc: " + str(avg_val_accuracy) + "\nf1: " + str(avg_val_f1) + "\n")
 
@@ -279,12 +295,13 @@ def train_bert(audio_model, audio_feature, dataset, text_only):
         total_eval_f1 += f1
     avg_val_accuracy = total_eval_accuracy / len(test_loader)
     avg_val_f1 = total_eval_f1 / len(test_loader)
-    wandb.log({"test_acc": avg_val_accuracy, "test_f1": avg_val_f1, "Steps": 1})
+    # wandb.log({"test_acc": avg_val_accuracy, "test_f1": avg_val_f1, "Steps": 1})
     print("test acc: " + str(avg_val_accuracy) + "\n test f1: " + str(avg_val_f1) + "\n")
-    torch.save(custom_model.state_dict(), "text_model/BERT_" + dataset + "_" + audio_model + "_" + audio_feature +".pt")
+    torch.save(custom_model.state_dict(), "text_models/BERT_" + dataset + "_" + audio_model + "_" + audio_feature +".pt")
 
 
 if __name__ == "__main__":
+    # parsing the input parameters of the script
     parser = argparse.ArgumentParser()
     parser.add_argument('-text_model', required=True, type=str)
     parser.add_argument('-text_feature_extraction', required=True, type=str)

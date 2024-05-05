@@ -1,9 +1,12 @@
+import nussl
 import torch
 import os
 import numpy as np
 import random
 import librosa
 import json
+from config.config import *
+from nltk.stem import WordNetLemmatizer
 from utils.feature_extraction import get_mfcconly, get_mfcconly_n_dim, get_collective_features_n_dim, \
     get_collective_features
 from utils.func import embedding_lookup
@@ -11,20 +14,6 @@ import torchaudio
 from transformers import BertTokenizer, BertModel
 from transformers import AutoFeatureExtractor
 from models import ConvNet, LSTM, CNN_small, simple_NN
-
-f = open("data/Subtask_2_2_train.json")
-data_old = json.load(f)
-filtered_data = {}
-speakers_data = {}
-# speakers_occurences = {}
-for h in data_old:
-    for g in h["conversation"]:
-        filtered_data[str(h["conversation_ID"]) + "_" + str(g["utterance_ID"])] = g["emotion"]
-        speakers_data[str(h["conversation_ID"]) + "_" + str(g["utterance_ID"])] = g["speaker"]
-        # if g["speaker"] not in speakers_occurences:
-        #     speakers_occurences[g["speaker"]] = 0
-        # speakers_occurences[g["speaker"]] += 1
-
 
 RAVDESS_emotions = [
     "01",
@@ -55,18 +44,12 @@ emotion_categories = [
     "fear",
 ]
 
-speakers = [
-    "Joey",
-    "Ross",
-    "Rachel",
-    "Phoebe",
-    "Monica",
-    "Chandler"
-]
-
 
 def load_ecf_structure():
-    f = open("data/Subtask_2_2_train.json")
+    '''
+    Loading the ecf dataset into filtered data dictionary for easier further processing
+    '''
+    f = open(ECF_TEXT_JSON_PATH)
     data = json.load(f)
     filtered_data = {}
     for h in data:
@@ -75,21 +58,25 @@ def load_ecf_structure():
 
     return data, filtered_data
 
+
 def load_iemocap_structure():
+    '''
+    Loading and filtering of the IEMOCAP dataset.
+    '''
     iemocap_emotion_exclude = ["hap", "xxx", "oth", "fea", "sur", "dis"]
     text_transcriptions = {}
-    transcriptions = os.listdir("IEMOCAP/transcription")
+    transcriptions = os.listdir(IEMOCAP_TRANSCRIPTIONS_FODER)
     for f in transcriptions:
-        transcription = open("IEMOCAP/transcription/"+f).readlines()
+        transcription = open(IEMOCAP_TRANSCRIPTIONS_FODER + "/" + f).readlines()
         for line in transcription:
             inf = line.split(":")
             if inf[0] not in text_transcriptions:
                 text_transcriptions[inf[0].split()[0]] = inf[1]
 
-    emotion_files = os.listdir("IEMOCAP/emotions")
+    emotion_files = os.listdir(IEMOCAP_EMOTIONS_FOLDER)
     iemocap_data = []
     for f in emotion_files:
-        dialogue = open("IEMOCAP/emotions/"+f).readlines()
+        dialogue = open(IEMOCAP_EMOTIONS_FOLDER + "/" + f).readlines()
         relevant_lines = []
         for line in dialogue:
             if line[0] == "[":
@@ -105,9 +92,11 @@ def load_iemocap_structure():
     return iemocap_data
 
 
-
-
 def load_IEMOCAP(feature_method, model_name):
+    '''
+    Loading the IEMOCAP dataset into train, test and dev datasets for the audio learning.
+    '''
+    print("Loading IEMOCAP audio dataset.\n")
     iemocap_data = load_iemocap_structure()
     train_x = []
     train_y = []
@@ -117,6 +106,7 @@ def load_IEMOCAP(feature_method, model_name):
     val_y = []
     random_indexes = []
     val_indexes = []
+    # dividing the IEMOCAP dataset into train, test dev by random indexes from whole dataset
     while len(random_indexes) < 1000:
         index = random.randint(0, 6784)
         if index not in random_indexes:
@@ -127,11 +117,13 @@ def load_IEMOCAP(feature_method, model_name):
             val_indexes.append(index)
     counter = 0
     for entry in iemocap_data:
+        # classification class one hot vector
         y = np.zeros(5)
         emotion = entry["emotion"]
         y[IEMOCAP_emotions.index(emotion)] = 1.0
         file_name = entry["filename"]
-        audio_x, sample_rate = librosa.load("IEMOCAP/audio/" + file_name, duration=15)
+        # audio signal feature extraction by the given feature extraction method name
+        audio_x, sample_rate = librosa.load(IEMOCAP_AUDIO_FOLDER + "/" + file_name, duration=15)
         if feature_method == "collective_features":
             if model_name == "CNN2D":
                 features = get_collective_features_n_dim(audio_x, sample_rate, 300)
@@ -142,6 +134,8 @@ def load_IEMOCAP(feature_method, model_name):
                 features = get_mfcconly_n_dim(audio_x, sample_rate, 300)
             else:
                 features = get_mfcconly(audio_x, sample_rate)
+
+        # appending data into right dataset split
         if counter in random_indexes:
             test_x.append(features)
             test_y.append(y)
@@ -153,6 +147,7 @@ def load_IEMOCAP(feature_method, model_name):
             train_y.append(y)
         counter += 1
 
+    # converting list of numpy arrays of tensors into torch tensors.
     train_y = [torch.from_numpy(train_y[i]) for i in range(0, len(train_y))]
     train_y = torch.stack(train_y)
     test_y = [torch.from_numpy(test_y[i]) for i in range(0, len(test_y))]
@@ -168,7 +163,12 @@ def load_IEMOCAP(feature_method, model_name):
     val_y = val_y.float()
     return train_x, val_x, train_y, val_y, test_x, test_y
 
+
 def load_RAVDESS(feature_method, model_name):
+    '''
+    Loading of the RAVDESS dataset. Returns train, test and dev dataset
+    '''
+    print("Loading RAVDESS audio dataset.\n")
     folders = os.listdir("RAVDESS")
     train_x = []
     train_y = []
@@ -178,6 +178,7 @@ def load_RAVDESS(feature_method, model_name):
     val_y = []
     random_indexes = []
     val_indexes = []
+    # spliting the dataset into train, test and dev by random indexes from the whole dataset.
     while len(random_indexes) < 200:
         index = random.randint(0, 1399)
         if index not in random_indexes:
@@ -188,12 +189,14 @@ def load_RAVDESS(feature_method, model_name):
             val_indexes.append(index)
     counter = 0
     for f in folders:
-        files = os.listdir("RAVDESS/" + f)
+        files = os.listdir(RAVDESS_PATH + "/" + f)
         for file in files:
+            # one hot vector classification class representation
             y = np.zeros(8)
             emotion = file[6:8]
             y[RAVDESS_emotions.index(emotion)] = 1.0
-            audio_x, sample_rate = librosa.load("RAVDESS/" + f + "/" + file, duration=15)
+            # audio signal feature extraction by the given feature extraction method name.
+            audio_x, sample_rate = librosa.load(RAVDESS_PATH + "/" + f + "/" + file, duration=15)
             if feature_method == "collective_features":
                 if model_name == "CNN2D":
                     features = get_collective_features_n_dim(audio_x, sample_rate, 300)
@@ -215,6 +218,7 @@ def load_RAVDESS(feature_method, model_name):
                 train_y.append(y)
             counter += 1
 
+    # Converting the list of numpy arrays and list of tensors into torch tensors.
     train_y = [torch.from_numpy(train_y[i]) for i in range(0, len(train_y))]
     train_y = torch.stack(train_y)
     test_y = [torch.from_numpy(test_y[i]) for i in range(0, len(test_y))]
@@ -231,10 +235,19 @@ def load_RAVDESS(feature_method, model_name):
     return train_x, val_x, train_y, val_y, test_x, test_y
 
 
-def load_ECF(feature_method, model_name):
-    train_folder = "train"
-    val_folder = "val"
-    test_folder = "test"
+def load_ECF(feature_method, model_name, dataset):
+    '''
+    Loading of the ECF dataset.
+    '''
+    print("Loading ECF audio dataset.\n")
+    # determining if any of the noise reduction methods should be used
+    noise_reduction_method = None
+    if len(dataset.split("_")) > 1:
+        noise_reduction_method = dataset.split("_")[1]
+        print("Noise reduction " + noise_reduction_method + " used.\n")
+    train_folder = ECF_TRAIN_FOLDER + "/"
+    val_folder = ECF_DEV_FOLDER + "/"
+    test_folder = ECF_TEST_FOLDER + "/"
     trains = os.listdir(train_folder)
     vals = os.listdir(val_folder)
     tests = os.listdir(test_folder)
@@ -245,11 +258,26 @@ def load_ECF(feature_method, model_name):
     test_x = []
     test_y = []
     ecf_data, filtered_data = load_ecf_structure()
+    # appending the data into the right dataset split. The split is given by the dataset from the audio files location.
     for f in trains:
         key = f[3:].split("utt")[0] + "_" + f[3:].split("utt")[1].split(".")[0]
+        # classification class one hot vector representation
         y = np.zeros(7)
         y[emotion_categories.index(filtered_data[key])] = 1.0
-        audio_x, sample_rate = librosa.load("train/" + f, duration=15)
+        # audio signal feature extraction
+        audio_x, sample_rate = librosa.load(train_folder + f, duration=15)
+
+        # noise reduction application
+        if noise_reduction_method is not None:
+            audio_x = nussl.AudioSignal(audio_data_array=audio_x, sample_rate=sample_rate)
+            if noise_reduction_method == "FT2D":
+                ft2d = nussl.separation.primitive.FT2D(audio_x, mask_type='binary')
+                audio_x = ft2d()
+                audio_x = np.squeeze(audio_x[1].audio_data)
+            else:
+                separator = nussl.separation.primitive.RepetSim(audio_x, mask_type='binary')
+                audio_x = separator()
+                audio_x = np.squeeze(audio_x[1].audio_data)
         if feature_method == "collective_features":
             if model_name == "CNN2D":
                 features = get_collective_features_n_dim(audio_x, sample_rate, 300)
@@ -264,9 +292,23 @@ def load_ECF(feature_method, model_name):
         train.append(features)
     for f in vals:
         key = f[3:].split("utt")[0] + "_" + f[3:].split("utt")[1].split(".")[0]
+        # classification class one hot vector representation
         y = np.zeros(7)
         y[emotion_categories.index(filtered_data[key])] = 1.0
-        audio_x, sample_rate = librosa.load("val/" + f, duration=15)
+        # audio signal feature extraction
+        audio_x, sample_rate = librosa.load(val_folder + f, duration=15)
+
+        # noise reduction application
+        if noise_reduction_method is not None:
+            audio_x = nussl.AudioSignal(audio_data_array=audio_x, sample_rate=sample_rate)
+            if noise_reduction_method == "FT2D":
+                ft2d = nussl.separation.primitive.FT2D(audio_x, mask_type='binary')
+                audio_x = ft2d()
+                audio_x = np.squeeze(audio_x[1].audio_data)
+            else:
+                separator = nussl.separation.primitive.RepetSim(audio_x, mask_type='binary')
+                audio_x = separator()
+                audio_x = np.squeeze(audio_x[1].audio_data)
         if feature_method == "collective_features":
             if model_name == "CNN2D":
                 features = get_collective_features_n_dim(audio_x, sample_rate, 300)
@@ -281,9 +323,23 @@ def load_ECF(feature_method, model_name):
         val_y.append(y)
     for f in tests:
         key = f[3:].split("utt")[0] + "_" + f[3:].split("utt")[1].split(".")[0]
+        # classification class one hot vector representation
         y = np.zeros(7)
         y[emotion_categories.index(filtered_data[key])] = 1.0
-        audio_x, sample_rate = librosa.load("test/" + f, duration=15)
+        # audio signal feature extraction
+        audio_x, sample_rate = librosa.load(test_folder + f, duration=15)
+
+        # noise reduction application
+        if noise_reduction_method is not None:
+            audio_x = nussl.AudioSignal(audio_data_array=audio_x, sample_rate=sample_rate)
+            if noise_reduction_method == "FT2D":
+                ft2d = nussl.separation.primitive.FT2D(audio_x, mask_type='binary')
+                audio_x = ft2d()
+                audio_x = np.squeeze(audio_x[1].audio_data)
+            else:
+                separator = nussl.separation.primitive.RepetSim(audio_x, mask_type='binary')
+                audio_x = separator()
+                audio_x = np.squeeze(audio_x[1].audio_data)
         if feature_method == "collective_features":
             if model_name == "CNN2D":
                 features = get_collective_features_n_dim(audio_x, sample_rate, 300)
@@ -297,16 +353,22 @@ def load_ECF(feature_method, model_name):
         test_x.append(features)
         test_y.append(y)
 
+    # mapping all the data to torch tensors
     train, train_y, val_y, test_y, val, test_x = map(torch.tensor, [train, train_y, val_y, test_y, val, test_x])
     return train.float(), val.float(), train_y.float(), val_y.float(), test_x.float(), test_y.float()
 
 
 def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audio_features):
-    train_folder = "train"
-    test_folder = "test"
+    '''
+    Loading the multimodal data with the Word2vec text extraction method for the LSTM multimodal model.
+    '''
+    print("Loading dataset " + dataset + " for multimodal LSTM model with w2v embeddings.")
+    train_folder = ECF_TRAIN_FOLDER + "/"
+    test_folder = ECF_TEST_FOLDER + "/"
     trains = os.listdir(train_folder)
     tests = os.listdir(test_folder)
     train_x, train_y, test_x, test_y, dev_x, dev_y, train_a, test_a, dev_a = [], [], [], [], [], [], [], [], []
+    # initializing the audio feature extraction model by the audio model name given in the input parameters
     if audio_model == "LSTM":
         model = LSTM(audio_features, dataset)
     elif audio_model == "CNN1D":
@@ -316,20 +378,24 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
     else:
         model = simple_NN(audio_features, dataset)
 
-    if dataset == "ECF":
+    # setting the number of classification classes, out of vocabulary index for the Word2vec
+    # and loading the dataset data.
+    if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
         n_class = 7
         out_vocab = 6434
         data = []
         ecf_data, filtered_data = load_ecf_structure()
         for conv in ecf_data:
             for sent in conv["conversation"]:
-                data.append({"filename": sent["video_name"][:-3] + "wav", "emotion": sent["emotion"], "text": sent["text"]})
+                data.append(
+                    {"filename": sent["video_name"][:-3] + "wav", "emotion": sent["emotion"], "text": sent["text"]})
     else:
         n_class = 5
         out_vocab = 6338
         data = load_iemocap_structure()
         random_indexes = []
         val_indexes = []
+        # preparing the indexes for the IEMOCAP dataset train/test/dev split
         while len(random_indexes) < 1130:
             index = random.randint(0, 7531)
             if index not in random_indexes:
@@ -340,15 +406,18 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
                 val_indexes.append(index)
 
     saved_model_name = audio_model + "_" + dataset + "_" + audio_features + ".pt"
-    model.load_state_dict(torch.load("./mfcc_model/" + saved_model_name))
+    model.load_state_dict(torch.load("./audio_models/" + saved_model_name))
+    print("Weights for " + audio_model + " loaded.")
     counter = 0
     for conv in data:
+        # one hot classification classes vector
         data_x, data_y = np.zeros(max_sen_len), np.zeros(n_class)
-        if dataset == "ECF":
+        if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
             data_y[emotion_categories.index(conv["emotion"])] = 1
         else:
             data_y[IEMOCAP_emotions.index(conv["emotion"])] = 1
 
+        # transforming the dataset text into embeddings
         for j, word in enumerate(conv["text"].strip().split()):
             word = word.lower()
             if j >= max_sen_len:
@@ -359,8 +428,9 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
                 data_x[j] = int(word_idx[word])
 
         sentence_embeddings = embedding_lookup(word_embed, data_x)
+
         file_name = conv["filename"]
-        if dataset == "ECF":
+        if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
             x_input = get_audio_vector(audio_features, audio_model, file_name, dataset)
             out1, out2 = model(x_input.float())
             out2 = out2.squeeze()
@@ -394,6 +464,7 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
                 train_y.append(data_y)
         counter += 1
 
+    # Converting the list of numpy arrays or tensors into torch tensors
     train_a = torch.tensor(train_a)
     test_a = torch.tensor(test_a)
     dev_a = torch.tensor(dev_a)
@@ -408,14 +479,20 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
 
 
 def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features):
-    train_folder = "train"
-    test_folder = "test"
+    '''
+    Loading the multimodal data with the BERT embeddings text extraction method for the LSTM multimodal model.
+    '''
+    print("Loading dataset " + dataset + " for multimodal LSTM model with BERT embeddings.")
+    # determining the file path for the unchanged or the noise reduced ECF dataset
+    train_folder = ECF_TRAIN_FOLDER + "/"
+    test_folder = ECF_TEST_FOLDER + "/"
+
     bert_model = BertModel.from_pretrained("bert-base-uncased", output_hidden_states=True, )
     bert_tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
     trains = os.listdir(train_folder)
     tests = os.listdir(test_folder)
     train_x, train_y, test_x, test_y, dev_x, dev_y, train_a, test_a, dev_a = [], [], [], [], [], [], [], [], []
-
+    # initializing the audio feature extraction model by the audio model name given in the input parameters
     if audio_model == "LSTM":
         model = LSTM(audio_features, dataset)
     elif audio_model == "CNN1D":
@@ -425,18 +502,21 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features):
     else:
         model = simple_NN(audio_features, dataset)
 
-    if dataset == "ECF":
+    # setting the number of classification classes and loading the dataset data.
+    if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
         n_class = 7
         data = []
         ecf_data, filtered_data = load_ecf_structure()
         for conv in ecf_data:
             for sent in conv["conversation"]:
-                data.append({"filename": sent["video_name"][:-3] + "wav", "emotion": sent["emotion"], "text": sent["text"]})
+                data.append(
+                    {"filename": sent["video_name"][:-3] + "wav", "emotion": sent["emotion"], "text": sent["text"]})
     else:
         n_class = 5
         data = load_iemocap_structure()
         random_indexes = []
         val_indexes = []
+        # preparing the indexes for the IEMOCAP dataset train/test/dev split
         while len(random_indexes) < 1130:
             index = random.randint(0, 7531)
             if index not in random_indexes:
@@ -447,14 +527,18 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features):
                 val_indexes.append(index)
 
     saved_model_name = audio_model + "_" + dataset + "_" + audio_features + ".pt"
-    model.load_state_dict(torch.load("./mfcc_model/" + saved_model_name))
+    model.load_state_dict(torch.load("./audio_models/" + saved_model_name))
+    print("Weights for " + audio_model + " loaded.")
     counter = 0
     for conv in data:
+        # one hot classification classes vector
         data_x, data_y = np.zeros((max_sen_len, 768)), np.zeros(n_class)
-        if dataset == "ECF":
+        if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
             data_y[emotion_categories.index(conv["emotion"])] = 1
         else:
             data_y[IEMOCAP_emotions.index(conv["emotion"])] = 1
+
+        # preparing the text feature extraction with the BERT word embeddings.
         line = conv["text"].strip()
         tokenized_text, tokens_tensor, segments_tensors = bert_text_preparation(line, bert_tokenizer)
         embedding = get_bert_embeddings(tokens_tensor, segments_tensors, bert_model)
@@ -464,7 +548,7 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features):
             data_x[j] = np.array(emb)
 
         file_name = conv["filename"]
-        if dataset == "ECF":
+        if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
             x_input = get_audio_vector(audio_features, audio_model, file_name, dataset)
             out1, out2 = model(x_input.float())
             out2 = out2.squeeze()
@@ -498,6 +582,7 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features):
                 train_y.append(data_y)
         counter += 1
 
+    # Converting the list of numpy arrays or tensors into torch tensors
     train_a = torch.tensor(train_a)
     test_a = torch.tensor(test_a)
     dev_a = torch.tensor(dev_a)
@@ -508,14 +593,19 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features):
 
 
 def load_data_for_bert(dataset, audio_model, audio_feature):
-    train_folder = "train"
-    test_folder = "test"
+    '''
+    Method prepares the training data for the pretrained BERT model.
+    '''
+    print("Loading dataset " + dataset + " for multimodal BERT model.")
+    train_folder = ECF_TRAIN_FOLDER
+    test_folder = ECF_TEST_FOLDER
     bert_tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", do_lower_case=True)
     trains = os.listdir(train_folder)
     tests = os.listdir(test_folder)
     train_inputs, train_attention, train_labels, test_inputs, test_labels, \
     test_attention, dev_inputs, dev_attention, dev_labels, train_audio, test_audio, dev_audio = [], [], [], [], [], [], \
                                                                                                 [], [], [], [], [], []
+    # audio feature extraction model initialization
     if audio_model == "LSTM":
         model = LSTM(audio_feature, dataset)
     elif audio_model == "CNN1D":
@@ -525,20 +615,23 @@ def load_data_for_bert(dataset, audio_model, audio_feature):
     else:
         model = simple_NN(audio_feature, dataset)
 
-    if dataset == "ECF":
+    # setting the number of classification classes, maximum sentence lengths and loading the dataset data.
+    if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
         n_class = 7
         max_sen_len = 91
         data = []
         ecf_data, filtered_data = load_ecf_structure()
         for conv in ecf_data:
             for sent in conv["conversation"]:
-                data.append({"filename": sent["video_name"][:-3] + "wav", "emotion": sent["emotion"], "text": sent["text"]})
+                data.append(
+                    {"filename": sent["video_name"][:-3] + "wav", "emotion": sent["emotion"], "text": sent["text"]})
     else:
         n_class = 5
         max_sen_len = 126
         data = load_iemocap_structure()
         random_indexes = []
         val_indexes = []
+        # preparing the indexes for the IEMOCAP dataset train/test/dev split
         while len(random_indexes) < 1130:
             index = random.randint(0, 7531)
             if index not in random_indexes:
@@ -549,13 +642,14 @@ def load_data_for_bert(dataset, audio_model, audio_feature):
                 val_indexes.append(index)
 
     saved_model_name = audio_model + "_" + dataset + "_" + audio_feature + ".pt"
-    model.load_state_dict(torch.load("./mfcc_model/" + saved_model_name))
+    model.load_state_dict(torch.load("./audio_models/" + saved_model_name))
+    print("Weights for " + audio_model + " loaded.")
     counter = 0
     max_length = 0
     for conv in data:
         data_y = np.zeros(n_class)
         line = conv["text"].strip()
-        if dataset == "ECF":
+        if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
             data_y[emotion_categories.index(conv["emotion"])] = 1
         else:
             data_y[IEMOCAP_emotions.index(conv["emotion"])] = 1
@@ -570,7 +664,7 @@ def load_data_for_bert(dataset, audio_model, audio_feature):
         if encoded_dict['input_ids'].size()[1] > max_length:
             max_length = encoded_dict['input_ids'].size()[1]
         file_name = conv["filename"]
-        if dataset == "ECF":
+        if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
             x_input = get_audio_vector(audio_feature, audio_model, file_name, dataset)
             out1, out2 = model(x_input.float())
             out2 = out2.squeeze()
@@ -610,6 +704,7 @@ def load_data_for_bert(dataset, audio_model, audio_feature):
                 train_labels.append(data_y)
         counter += 1
 
+    # Converting the list of numpy arrays or tensors into torch tensors
     train_inputs = torch.cat(train_inputs, dim=0)
     train_attention = torch.cat(train_attention, dim=0)
     test_inputs = torch.cat(test_inputs, dim=0)
@@ -627,6 +722,9 @@ def load_data_for_bert(dataset, audio_model, audio_feature):
 
 
 def bert_text_preparation(text, tokenizer):
+    '''
+    Bert text tokenization.
+    '''
     marked_text = "[CLS] " + text + " [SEP]"
     tokenized_text = tokenizer.tokenize(marked_text)
     indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
@@ -637,6 +735,9 @@ def bert_text_preparation(text, tokenizer):
 
 
 def get_bert_embeddings(tokens_tensor, segments_tensors, model):
+    '''
+    retrieving the bert word embeddings from thew last hidden state of the pretrained BERT model.
+    '''
     with torch.no_grad():
         outputs = model(tokens_tensor, segments_tensors)
         hidden_states = outputs[2][1:]
@@ -650,7 +751,8 @@ def get_bert_embeddings(tokens_tensor, segments_tensors, model):
 def load_w2v(embedding_dim, embedding_path, dataset):
     print('\nloading embedding vectors\n')
     words = []
-    if dataset == "ECF":
+    # loading words of specified dataset
+    if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
         data, filtered_data = load_ecf_structure()
         for conv in data:
             for sentence in conv["conversation"]:
@@ -660,9 +762,12 @@ def load_w2v(embedding_dim, embedding_path, dataset):
         for entry in iemocap_data:
             words.extend(entry["text"].lower().strip().split())
 
+    # unique words
     words = set(words)
+    # word ids
     word_idx = dict((c, k + 1) for k, c in enumerate(words))
 
+    # getting the embeddings for the words
     w2v = {}
     inputFile1 = open(embedding_path, 'r')
     inputFile1.readline()
@@ -690,17 +795,63 @@ def load_w2v(embedding_dim, embedding_path, dataset):
 
 
 def get_audio_vector(audio_feature, model_name, filename, dataset):
-    train_folder = "train"
-    test_folder = "test"
+    '''
+    Creating the audio feature extraction vector depending on the given audio feature extraction method name,
+    audio model and dataset name.
+    '''
+    # determining if any of the noise reduction methods should be used
+    noise_reduction_method = None
+    if len(dataset.split("_")) > 1:
+        noise_reduction_method = dataset.split("_")[1]
+        print("Noise reduction " + noise_reduction_method + " used.\n")
+    train_folder = ECF_TRAIN_FOLDER + "/"
+    val_folder = ECF_DEV_FOLDER + "/"
+    test_folder = ECF_TEST_FOLDER + "/"
     trains = os.listdir(train_folder)
     tests = os.listdir(test_folder)
-    if dataset == "ECF":
+    if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
         if filename in trains:
-            audio_x, sample_rate = librosa.load("train/" + filename, duration=15)
+            audio_x, sample_rate = librosa.load(train_folder + filename, duration=15)
+
+            # noise reduction application
+            if noise_reduction_method is not None:
+                audio_x = nussl.AudioSignal(audio_data_array=audio_x, sample_rate=sample_rate)
+                if noise_reduction_method == "FT2D":
+                    ft2d = nussl.separation.primitive.FT2D(audio_x, mask_type='binary')
+                    audio_x = ft2d()
+                    audio_x = np.squeeze(audio_x[1].audio_data)
+                else:
+                    separator = nussl.separation.primitive.RepetSim(audio_x, mask_type='binary')
+                    audio_x = separator()
+                    audio_x = np.squeeze(audio_x[1].audio_data)
         elif filename in tests:
-            audio_x, sample_rate = librosa.load("test/" + filename, duration=15)
+            audio_x, sample_rate = librosa.load(test_folder + filename, duration=15)
+
+            # noise reduction application
+            if noise_reduction_method is not None:
+                audio_x = nussl.AudioSignal(audio_data_array=audio_x, sample_rate=sample_rate)
+                if noise_reduction_method == "FT2D":
+                    ft2d = nussl.separation.primitive.FT2D(audio_x, mask_type='binary')
+                    audio_x = ft2d()
+                    audio_x = np.squeeze(audio_x[1].audio_data)
+                else:
+                    separator = nussl.separation.primitive.RepetSim(audio_x, mask_type='binary')
+                    audio_x = separator()
+                    audio_x = np.squeeze(audio_x[1].audio_data)
         else:
-            audio_x, sample_rate = librosa.load("val/" + filename, duration=15)
+            audio_x, sample_rate = librosa.load(val_folder + filename, duration=15)
+
+            # noise reduction application
+            if noise_reduction_method is not None:
+                audio_x = nussl.AudioSignal(audio_data_array=audio_x, sample_rate=sample_rate)
+                if noise_reduction_method == "FT2D":
+                    ft2d = nussl.separation.primitive.FT2D(audio_x, mask_type='binary')
+                    audio_x = ft2d()
+                    audio_x = np.squeeze(audio_x[1].audio_data)
+                else:
+                    separator = nussl.separation.primitive.RepetSim(audio_x, mask_type='binary')
+                    audio_x = separator()
+                    audio_x = np.squeeze(audio_x[1].audio_data)
 
         if audio_feature == "collective_features":
             if model_name == "CNN2D":
@@ -713,6 +864,7 @@ def get_audio_vector(audio_feature, model_name, filename, dataset):
             else:
                 audio_data = get_mfcconly(audio_x, sample_rate)
         x_input = torch.from_numpy(audio_data)
+        # reshaping the dimensions for the audio model
         if model_name == "CNN2D":
             x_input = x_input[None, None, :, :]
         elif model_name == "CNN1D" or model_name == "LSTM":
@@ -720,7 +872,7 @@ def get_audio_vector(audio_feature, model_name, filename, dataset):
         else:
             x_input = x_input[None, :]
     else:
-        audio_x, sample_rate = librosa.load("IEMOCAP/audio/" + filename, duration=15)
+        audio_x, sample_rate = librosa.load(IEMOCAP_AUDIO_FOLDER + "/" + filename, duration=15)
         if audio_feature == "collective_features":
             if model_name == "CNN2D":
                 audio_data = get_collective_features_n_dim(audio_x, sample_rate, 300)
@@ -732,6 +884,7 @@ def get_audio_vector(audio_feature, model_name, filename, dataset):
             else:
                 audio_data = get_mfcconly(audio_x, sample_rate)
         x_input = torch.from_numpy(audio_data)
+        # reshaping the dimensions for the audio model
         if model_name == "CNN2D":
             x_input = x_input[None, None, :, :]
         elif model_name == "CNN1D" or model_name == "LSTM":
