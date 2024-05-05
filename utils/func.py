@@ -1,9 +1,8 @@
 import torch
 from torch.nn import functional as F
-from torchmetrics import Accuracy, F1Score
-from torcheval.metrics.functional import multiclass_f1_score, multiclass_accuracy, multilabel_accuracy
-from torch.nn.utils.rnn import pad_sequence
-import numpy as np
+from torcheval.metrics.functional import multiclass_f1_score
+from torchmetrics import Accuracy
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 

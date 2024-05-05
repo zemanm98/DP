@@ -3,7 +3,6 @@ import argparse
 import torch.nn
 from torch.utils.data import DataLoader
 
-import wandb
 from config.config import *
 from dataset_loading import *
 from models import LSTM_text_emotions, CustomBert
@@ -156,6 +155,9 @@ def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
         f1, acc = f1_acc(test_pred_y, test_y, dataset)
         # wandb.log({"test_acc": acc, "test_f1": f1, "Steps": 1})
         print("\ntest acc: " + str(acc) + "\ntest f1: " + str(f1) + "\n")
+
+    if not os.path.exists("./text_models"):
+        os.makedirs("./text_models")
     torch.save(model.state_dict(), "text_models/LSTM_" + dataset + "_" + text_features + "_" + audio_model + "_" + audio_features + ".pt")
 
 

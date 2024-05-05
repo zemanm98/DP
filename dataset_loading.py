@@ -1,19 +1,18 @@
+import json
+import os
+import random
+
+import librosa
+import numpy as np
 import nussl
 import torch
-import os
-import numpy as np
-import random
-import librosa
-import json
+from transformers import BertTokenizer, BertModel
+
 from config.config import *
-from nltk.stem import WordNetLemmatizer
+from models import ConvNet, LSTM, CNN_small, simple_NN
 from utils.feature_extraction import get_mfcconly, get_mfcconly_n_dim, get_collective_features_n_dim, \
     get_collective_features
 from utils.func import embedding_lookup
-import torchaudio
-from transformers import BertTokenizer, BertModel
-from transformers import AutoFeatureExtractor
-from models import ConvNet, LSTM, CNN_small, simple_NN
 
 RAVDESS_emotions = [
     "01",

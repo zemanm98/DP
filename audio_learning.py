@@ -5,7 +5,6 @@ import argparse
 from dataset_loading import load_ECF, load_RAVDESS, load_IEMOCAP
 from models import LSTM, ConvNet, CNN_small, simple_NN
 from utils.func import f1_acc
-import wandb
 import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -103,12 +102,6 @@ def audio_emotion_learn(model_name, dataset, feature_extraction):
     else:
         train_eval_step = 37
 
-    # wandb logging initialization
-    # wandb_run_name = model_name + "_" + dataset + "_" + feature_extraction
-    # wandb.init(project="DP", entity="zeman339", name=wandb_run_name, config=config)
-    # wandb.define_metric("Steps")
-    # wandb.define_metric("*", step_metric="Steps")
-
     loader = DataLoader(list(zip(train_x, train_y)), shuffle=True, batch_size=config["batch_size"])
     train_step_counter = 1
     test_step_counter = 1
@@ -140,7 +133,6 @@ def audio_emotion_learn(model_name, dataset, feature_extraction):
                 eval_pred_y, _ = model(train_x_batch.to(device))
                 eval_pred_y = torch.squeeze(eval_pred_y)
                 f1, acc = f1_acc(eval_pred_y, train_y_batch, dataset)
-                # wandb.log({"train_acc": acc, "train_f1": f1, "Steps": train_step_counter})
                 train_step_counter += 1
                 print("train acc: " + str(acc) + ";  train f1: " + str(f1) + ";  loss: " + str(loss))
                 train_x_batch, train_y_batch = initialize_train_tensors(model_name, feature_extraction, dataset)
@@ -154,7 +146,6 @@ def audio_emotion_learn(model_name, dataset, feature_extraction):
             dev_pred_y, _ = model(val_x.to(device))
             dev_pred_y = torch.squeeze(dev_pred_y)
             f1, acc = f1_acc(dev_pred_y, val_y, dataset)
-            # wandb.log({"val_acc": acc, "val_f1": f1, "Steps": test_step_counter})
             test_step_counter += 1
             print("epoch: " + str(epoch) + "\nacc: " + str(acc) + "\nf1: " + str(f1) + "\n")
 
@@ -163,7 +154,6 @@ def audio_emotion_learn(model_name, dataset, feature_extraction):
         test_pred_y, _ = model(test_x.to(device))
         test_pred_y = torch.squeeze(test_pred_y)
         f1, acc = f1_acc(test_pred_y, test_y, dataset)
-        # wandb.log({"test_acc": acc, "test_f1": f1, "Steps": 1})
         print("Test metrics:\nacc: " + str(acc) + "\nf1: " + str(f1) + "\n")
 
     if not os.path.exists("./audio_models"):
