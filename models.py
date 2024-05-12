@@ -157,7 +157,7 @@ class simple_NN(torch.nn.Module):
 LSTM text multimodal and textual emotion recognition model
 '''
 class LSTM_text_emotions(torch.nn.Module):
-    def __init__(self, dataset, text_features, text_only):
+    def __init__(self, dataset, text_features, text_only, use_audio_model, audio_features):
         super(LSTM_text_emotions, self).__init__()
         self.n_hidden = 150
         self.exclude_audio = text_only
@@ -171,7 +171,13 @@ class LSTM_text_emotions(torch.nn.Module):
         if self.exclude_audio:
             self.combined_input = 2 * self.n_hidden
         else:
-            self.combined_input = 2 * self.n_hidden + 50
+            if use_audio_model:
+                self.combined_input = 2 * self.n_hidden + 50
+            else:
+                if audio_features == "mfcc_only":
+                    self.combined_input = 2 * self.n_hidden + 50
+                else:
+                    self.combined_input = 2 * self.n_hidden + 312
 
         # the number of classification classes of the used dataset
         if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
@@ -202,7 +208,7 @@ class LSTM_text_emotions(torch.nn.Module):
 BERT multimodal or textual model
 '''
 class CustomBert(torch.nn.Module):
-    def __init__(self, dataset, text_only):
+    def __init__(self, dataset, text_only, use_audio_model, audio_features):
         super(CustomBert, self).__init__()
         self.text_only = text_only
         self.config = AutoConfig.from_pretrained("bert-base-uncased")
@@ -217,7 +223,13 @@ class CustomBert(torch.nn.Module):
         if text_only:
             self.linear_input_size = num_hidden_size
         else:
-            self.linear_input_size = num_hidden_size + 50
+            if use_audio_model:
+                self.linear_input_size = num_hidden_size + 50
+            else:
+                if audio_features == "mfcc_only":
+                    self.linear_input_size = num_hidden_size + 50
+                else:
+                    self.linear_input_size = num_hidden_size + 312
         self.classifier = torch.nn.Linear(self.linear_input_size, self.n_class)
 
     def forward(self, input_ids, attention_masks, audio=None):

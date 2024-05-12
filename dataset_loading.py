@@ -357,7 +357,7 @@ def load_ECF(feature_method, model_name, dataset):
     return train.float(), val.float(), train_y.float(), val_y.float(), test_x.float(), test_y.float()
 
 
-def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audio_features):
+def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audio_features, use_audio_model):
     '''
     Loading the multimodal data with the Word2vec text extraction method for the LSTM multimodal model.
     '''
@@ -409,7 +409,8 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
 
     saved_model_name = audio_model + "_" + dataset + "_" + audio_features + ".pt"
     model.load_state_dict(torch.load("./audio_models/" + saved_model_name))
-    print("Weights for " + audio_model + " loaded.")
+    if use_audio_model:
+        print("Weights for " + audio_model + " loaded.")
     counter = 0
     for conv in data:
         # one hot classification classes vector
@@ -433,43 +434,51 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
 
         file_name = conv["filename"]
         if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
-            x_input = get_audio_vector(audio_features, audio_model, file_name, dataset)
-            out1, out2 = model(x_input.float())
-            out2 = out2.squeeze()
+            if use_audio_model:
+                x_input = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
+                out1, out2 = model(x_input.float())
+                out2 = out2.squeeze()
+                audio_vector = out2.detach().numpy()
+            else:
+                audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
             if file_name in trains:
-                train_a.append(out2.detach().numpy())
+                train_a.append(audio_vector)
                 train_x.append(sentence_embeddings)
                 train_y.append(data_y)
             elif file_name in tests:
-                test_a.append(out2.detach().numpy())
+                test_a.append(audio_vector)
                 test_x.append(sentence_embeddings)
                 test_y.append(data_y)
             else:
-                dev_a.append(out2.detach().numpy())
+                dev_a.append(audio_vector)
                 dev_x.append(sentence_embeddings)
                 dev_y.append(data_y)
         else:
-            x_input = get_audio_vector(audio_features, audio_model, file_name, dataset)
-            out1, out2 = model(x_input.float())
-            out2 = out2.squeeze()
+            if use_audio_model:
+                x_input = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
+                out1, out2 = model(x_input.float())
+                out2 = out2.squeeze()
+                audio_vector = out2.detach().numpy()
+            else:
+                audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
             if counter in random_indexes:
                 test_x.append(sentence_embeddings)
                 test_y.append(data_y)
-                test_a.append(out2.detach().numpy())
+                test_a.append(audio_vector)
             elif counter in val_indexes:
-                dev_a.append(out2.detach().numpy())
+                dev_a.append(audio_vector)
                 dev_x.append(sentence_embeddings)
                 dev_y.append(data_y)
             else:
-                train_a.append(out2.detach().numpy())
+                train_a.append(audio_vector)
                 train_x.append(sentence_embeddings)
                 train_y.append(data_y)
         counter += 1
 
     # Converting the list of numpy arrays or tensors into torch tensors
-    train_a = torch.tensor(train_a)
-    test_a = torch.tensor(test_a)
-    dev_a = torch.tensor(dev_a)
+    train_a = torch.stack((train_a))
+    test_a = torch.stack((test_a))
+    dev_a = torch.stack((dev_a))
     train_y = torch.tensor(train_y)
     train_x = torch.stack((train_x))
     test_x = torch.stack((test_x))
@@ -480,7 +489,7 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
     return train_x, train_y, test_x, test_y, dev_x, dev_y, train_a, test_a, dev_a
 
 
-def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features):
+def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features, use_audio_model):
     '''
     Loading the multimodal data with the BERT embeddings text extraction method for the LSTM multimodal model.
     '''
@@ -533,7 +542,8 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features):
 
     saved_model_name = audio_model + "_" + dataset + "_" + audio_features + ".pt"
     model.load_state_dict(torch.load("./audio_models/" + saved_model_name))
-    print("Weights for " + audio_model + " loaded.")
+    if use_audio_model:
+        print("Weights for " + audio_model + " loaded.")
     counter = 0
     for conv in data:
         # one hot classification classes vector
@@ -554,50 +564,58 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features):
 
         file_name = conv["filename"]
         if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
-            x_input = get_audio_vector(audio_features, audio_model, file_name, dataset)
-            out1, out2 = model(x_input.float())
-            out2 = out2.squeeze()
+            if use_audio_model:
+                x_input = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
+                out1, out2 = model(x_input.float())
+                out2 = out2.squeeze()
+                audio_vector = out2.detach()
+            else:
+                audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
             if file_name in trains:
-                train_a.append(out2.detach().numpy())
+                train_a.append(audio_vector)
                 train_x.append(data_x)
                 train_y.append(data_y)
             elif file_name in tests:
-                test_a.append(out2.detach().numpy())
+                test_a.append(audio_vector)
                 test_x.append(data_x)
                 test_y.append(data_y)
             else:
-                dev_a.append(out2.detach().numpy())
+                dev_a.append(audio_vector)
                 dev_x.append(data_x)
                 dev_y.append(data_y)
         else:
-            x_input = get_audio_vector(audio_features, audio_model, file_name, dataset)
-            out1, out2 = model(x_input.float())
-            out2 = out2.squeeze()
+            if use_audio_model:
+                x_input = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
+                out1, out2 = model(x_input.float())
+                out2 = out2.squeeze()
+                audio_vector = out2.detach()
+            else:
+                audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
             if counter in random_indexes:
                 test_x.append(data_x)
                 test_y.append(data_y)
-                test_a.append(out2.detach().numpy())
+                test_a.append(audio_vector)
             elif counter in val_indexes:
-                dev_a.append(out2.detach().numpy())
+                dev_a.append(audio_vector)
                 dev_x.append(data_x)
                 dev_y.append(data_y)
             else:
-                train_a.append(out2.detach().numpy())
+                train_a.append(audio_vector)
                 train_x.append(data_x)
                 train_y.append(data_y)
         counter += 1
 
     # Converting the list of numpy arrays or tensors into torch tensors
-    train_a = torch.tensor(train_a)
-    test_a = torch.tensor(test_a)
-    dev_a = torch.tensor(dev_a)
+    train_a = torch.stack((train_a))
+    test_a = torch.stack((test_a))
+    dev_a = torch.stack((dev_a))
     train_x, train_y, test_x, test_y, dev_x, dev_y = map(torch.tensor,
                                                          [train_x, train_y, test_x, test_y, dev_x, dev_y])
 
     return train_x, train_y, test_x, test_y, dev_x, dev_y, train_a, test_a, dev_a
 
 
-def load_data_for_bert(dataset, audio_model, audio_feature):
+def load_data_for_bert(dataset, audio_model, audio_feature, use_audio_model):
     '''
     Method prepares the training data for the pretrained BERT model.
     '''
@@ -651,7 +669,8 @@ def load_data_for_bert(dataset, audio_model, audio_feature):
 
     saved_model_name = audio_model + "_" + dataset + "_" + audio_feature + ".pt"
     model.load_state_dict(torch.load("./audio_models/" + saved_model_name))
-    print("Weights for " + audio_model + " loaded.")
+    if use_audio_model:
+        print("Weights for " + audio_model + " loaded.")
     counter = 0
     max_length = 0
     for conv in data:
@@ -673,40 +692,48 @@ def load_data_for_bert(dataset, audio_model, audio_feature):
             max_length = encoded_dict['input_ids'].size()[1]
         file_name = conv["filename"]
         if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
-            x_input = get_audio_vector(audio_feature, audio_model, file_name, dataset)
-            out1, out2 = model(x_input.float())
-            out2 = out2.squeeze()
+            if use_audio_model:
+                x_input = get_audio_vector(audio_feature, audio_model, file_name, dataset, use_audio_model)
+                out1, out2 = model(x_input.float())
+                out2 = out2.squeeze()
+                audio_vector = out2.detach()
+            else:
+                audio_vector = get_audio_vector(audio_feature, audio_model, file_name, dataset, use_audio_model)
             if file_name in trains:
-                train_audio.append(out2.detach().numpy())
+                train_audio.append(audio_vector)
                 train_inputs.append(encoded_dict['input_ids'])
                 train_attention.append(encoded_dict['attention_mask'])
                 train_labels.append(data_y)
             elif file_name in tests:
-                test_audio.append(out2.detach().numpy())
+                test_audio.append(audio_vector)
                 test_inputs.append(encoded_dict['input_ids'])
                 test_attention.append(encoded_dict['attention_mask'])
                 test_labels.append(data_y)
             else:
-                dev_audio.append(out2.detach().numpy())
+                dev_audio.append(audio_vector)
                 dev_inputs.append(encoded_dict['input_ids'])
                 dev_attention.append(encoded_dict['attention_mask'])
                 dev_labels.append(data_y)
         else:
-            x_input = get_audio_vector(audio_feature, audio_model, file_name, dataset)
-            out1, out2 = model(x_input.float())
-            out2 = out2.squeeze()
+            if use_audio_model:
+                x_input = get_audio_vector(audio_feature, audio_model, file_name, dataset, use_audio_model)
+                out1, out2 = model(x_input.float())
+                out2 = out2.squeeze()
+                audio_vector = out2.detach()
+            else:
+                audio_vector = get_audio_vector(audio_feature, audio_model, file_name, dataset, use_audio_model)
             if counter in random_indexes:
-                test_audio.append(out2.detach().numpy())
+                test_audio.append(audio_vector)
                 test_inputs.append(encoded_dict['input_ids'])
                 test_attention.append(encoded_dict['attention_mask'])
                 test_labels.append(data_y)
             elif counter in val_indexes:
-                dev_audio.append(out2.detach().numpy())
+                dev_audio.append(audio_vector)
                 dev_inputs.append(encoded_dict['input_ids'])
                 dev_attention.append(encoded_dict['attention_mask'])
                 dev_labels.append(data_y)
             else:
-                train_audio.append(out2.detach().numpy())
+                train_audio.append(audio_vector)
                 train_inputs.append(encoded_dict['input_ids'])
                 train_attention.append(encoded_dict['attention_mask'])
                 train_labels.append(data_y)
@@ -722,9 +749,9 @@ def load_data_for_bert(dataset, audio_model, audio_feature):
     train_labels = torch.tensor(train_labels)
     test_labels = torch.tensor(test_labels)
     dev_labels = torch.tensor(dev_labels)
-    train_audio = torch.tensor(train_audio)
-    test_audio = torch.tensor(test_audio)
-    dev_audio = torch.tensor(dev_audio)
+    train_audio = torch.stack((train_audio))
+    test_audio = torch.stack((test_audio))
+    dev_audio = torch.stack((dev_audio))
     return train_inputs, train_attention, train_labels, test_inputs, test_labels, \
            test_attention, dev_inputs, dev_attention, dev_labels, train_audio, test_audio, dev_audio
 
@@ -802,7 +829,7 @@ def load_w2v(embedding_dim, embedding_path, dataset):
     return word_idx, embedding
 
 
-def get_audio_vector(audio_feature, model_name, filename, dataset):
+def get_audio_vector(audio_feature, model_name, filename, dataset, use_audio_model):
     '''
     Creating the audio feature extraction vector depending on the given audio feature extraction method name,
     audio model and dataset name.
@@ -860,43 +887,57 @@ def get_audio_vector(audio_feature, model_name, filename, dataset):
                     audio_x = separator()
                     audio_x = np.squeeze(audio_x[1].audio_data)
 
-        if audio_feature == "collective_features":
-            if model_name == "CNN2D":
-                audio_data = get_collective_features_n_dim(audio_x, sample_rate, 300)
+        if use_audio_model:
+            if audio_feature == "collective_features":
+                if model_name == "CNN2D":
+                    audio_data = get_collective_features_n_dim(audio_x, sample_rate, 300)
+                else:
+                    audio_data = get_collective_features(audio_x, sample_rate)
             else:
-                audio_data = get_collective_features(audio_x, sample_rate)
-        else:
+                if model_name == "CNN2D":
+                    audio_data = get_mfcconly_n_dim(audio_x, sample_rate, 300)
+                else:
+                    audio_data = get_mfcconly(audio_x, sample_rate)
+            x_input = torch.from_numpy(audio_data)
+            # reshaping the dimensions for the audio model
             if model_name == "CNN2D":
-                audio_data = get_mfcconly_n_dim(audio_x, sample_rate, 300)
+                x_input = x_input[None, None, :, :]
+            elif model_name == "CNN1D" or model_name == "LSTM":
+                x_input = x_input[None, None, :]
+            else:
+                x_input = x_input[None, :]
+        else:
+            if audio_feature == "collective_features":
+                audio_data = get_collective_features(audio_x, sample_rate)
             else:
                 audio_data = get_mfcconly(audio_x, sample_rate)
-        x_input = torch.from_numpy(audio_data)
-        # reshaping the dimensions for the audio model
-        if model_name == "CNN2D":
-            x_input = x_input[None, None, :, :]
-        elif model_name == "CNN1D" or model_name == "LSTM":
-            x_input = x_input[None, None, :]
-        else:
-            x_input = x_input[None, :]
+            x_input = torch.from_numpy(audio_data)
     else:
         audio_x, sample_rate = librosa.load(IEMOCAP_AUDIO_FOLDER + "/" + filename, duration=15)
-        if audio_feature == "collective_features":
-            if model_name == "CNN2D":
-                audio_data = get_collective_features_n_dim(audio_x, sample_rate, 300)
+        if use_audio_model:
+            if audio_feature == "collective_features":
+                if model_name == "CNN2D":
+                    audio_data = get_collective_features_n_dim(audio_x, sample_rate, 300)
+                else:
+                    audio_data = get_collective_features(audio_x, sample_rate)
             else:
-                audio_data = get_collective_features(audio_x, sample_rate)
-        else:
+                if model_name == "CNN2D":
+                    audio_data = get_mfcconly_n_dim(audio_x, sample_rate, 300)
+                else:
+                    audio_data = get_mfcconly(audio_x, sample_rate)
+            x_input = torch.from_numpy(audio_data)
+            # reshaping the dimensions for the audio model
             if model_name == "CNN2D":
-                audio_data = get_mfcconly_n_dim(audio_x, sample_rate, 300)
+                x_input = x_input[None, None, :, :]
+            elif model_name == "CNN1D" or model_name == "LSTM":
+                x_input = x_input[None, None, :]
+            else:
+                x_input = x_input[None, :]
+        else:
+            if audio_feature == "collective_features":
+                audio_data = get_collective_features(audio_x, sample_rate)
             else:
                 audio_data = get_mfcconly(audio_x, sample_rate)
-        x_input = torch.from_numpy(audio_data)
-        # reshaping the dimensions for the audio model
-        if model_name == "CNN2D":
-            x_input = x_input[None, None, :, :]
-        elif model_name == "CNN1D" or model_name == "LSTM":
-            x_input = x_input[None, None, :]
-        else:
-            x_input = x_input[None, :]
+            x_input = torch.from_numpy(audio_data)
 
     return x_input

@@ -50,26 +50,27 @@ def validate_input(text_model, audio_model, text_features, audio_features, datas
         return
 
 
-def text_training(text_model, audio_model, text_features, audio_features, dataset, text_only):
+def text_training(text_model, audio_model, text_features, audio_features, dataset, text_only, use_audio_model):
     # validating the input parameters
     validate_input(text_model, audio_model, text_features, audio_features, dataset)
     print("Input parameters validated\nMultimodal model: " + text_model + "\nAudio model: " + audio_model +
           "\nText features: " + text_features + "\nAudio features: " + audio_features + "\nDataset: " + dataset + "\n")
+    print("\nText only: " + str(text_only) + "\nUse Audio Model: " + str(use_audio_model) + "\n")
     # The RAVDESS dataset does not have a text transcription so only audio learning is employed
-    if dataset == "RAVDESS":
+    if dataset == "RAVDESS" and not text_only and use_audio_model:
         audio_emotion_learn(audio_model, dataset, audio_features)
     else:
         if text_model == "LSTM":
-            train_LSTM(audio_model, text_features, audio_features, dataset, text_only)
+            train_LSTM(audio_model, text_features, audio_features, dataset, text_only, use_audio_model)
         else:
-            train_bert(audio_model, audio_features, dataset, text_only)
+            train_bert(audio_model, audio_features, dataset, text_only, use_audio_model)
 
 
-def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
-    model = LSTM_text_emotions(dataset, text_features, text_only)
+def train_LSTM(audio_model, text_features, audio_features, dataset, text_only, use_audio_model):
+    model = LSTM_text_emotions(dataset, text_features, text_only, use_audio_model, audio_features)
     audio_model_name = audio_model + "_" + dataset + "_" + audio_features + ".pt"
     # if the audio feature extraction model does not exist, train it first
-    if not os.path.isfile("audio_models/" + audio_model_name):
+    if not os.path.isfile("audio_models/" + audio_model_name) and not text_only and use_audio_model:
         print("Audio model save point not found. Audio model learning process begun.\n")
         audio_emotion_learn(audio_model, dataset, audio_features)
 
@@ -79,10 +80,10 @@ def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
         word_embedding = torch.from_numpy(word_embedding)
         train_x, train_y, test_x, test_y, dev_x, dev_y, train_audio, test_audio, dev_audio = load_text_data(
             word_id_mapping, word_embedding,
-            30, dataset, audio_model, audio_features)
+            30, dataset, audio_model, audio_features, use_audio_model)
     else:
         train_x, train_y, test_x, test_y, dev_x, dev_y, train_audio, test_audio, dev_audio =\
-            load_text_data_bert(30, dataset, audio_model, audio_features)
+            load_text_data_bert(30, dataset, audio_model, audio_features, use_audio_model)
 
     # train evaluation step interval for the wandb logging
     if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
@@ -149,18 +150,19 @@ def train_LSTM(audio_model, text_features, audio_features, dataset, text_only):
     torch.save(model.state_dict(), "text_models/LSTM_" + dataset + "_" + text_features + "_" + audio_model + "_" + audio_features + ".pt")
 
 
-def train_bert(audio_model, audio_feature, dataset, text_only):
+def train_bert(audio_model, audio_feature, dataset, text_only, use_audio_model):
     audio_model_name = audio_model + "_" + dataset + "_" + audio_feature + ".pt"
-    if not os.path.isfile("mfcc_model/" + audio_model_name):
+    if not os.path.isfile("mfcc_model/" + audio_model_name) and not text_only and use_audio_model:
         print("Audio model save point not found. Audio model learning process begun.\n")
         audio_emotion_learn(audio_model, dataset, audio_feature)
 
-    custom_model = CustomBert(dataset, text_only)
+    custom_model = CustomBert(dataset, text_only, use_audio_model, audio_feature)
     # loading the dataset data for the BERT model
     train_inputs, train_attention, train_labels, test_inputs, test_labels, \
     test_attention, dev_inputs, dev_attention, dev_labels, train_audio, test_audio, dev_audio = load_data_for_bert(dataset,
                                                                                                                    audio_model,
-                                                                                                                   audio_feature)
+                                                                                                                   audio_feature,
+                                                                                                                   use_audio_model)
     train_dataset = TensorDataset(train_inputs, train_attention, train_labels, train_audio)
     test_dataset = TensorDataset(test_inputs, test_attention, test_labels, test_audio)
     dev_dataset = TensorDataset(dev_inputs, dev_attention, dev_labels, dev_audio)
@@ -287,11 +289,23 @@ if __name__ == "__main__":
     parser.add_argument('-audio_feature_extraction', required=True, type=str)
     parser.add_argument('-dataset', required=True, type=str)
     parser.add_argument('-text_only', required=True, type=str)
+    parser.add_argument('-use_audio_model', required=True, type=str)
     args = parser.parse_args()
     text_only = args.text_only
+    if text_only.lower() not in ["true", "false"]:
+        print("-text_only argument can be either tru ot false. Nothing else.")
+        exit(0)
     if text_only.lower() == "true":
         text_only = True
     else:
         text_only = False
+    use_audio_model = args.use_audio_model
+    if use_audio_model.lower() not in ["true", "false"]:
+        print("-use_audio_model argument can be either tru ot false. Nothing else.")
+        exit(0)
+    if use_audio_model.lower() == "true":
+        use_audio_model = True
+    else:
+        use_audio_model = False
     text_training(args.text_model, args.audio_model, args.text_feature_extraction, args.audio_feature_extraction,
-                  args.dataset, text_only)
+                  args.dataset, text_only, use_audio_model)
