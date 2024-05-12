@@ -23,6 +23,7 @@ purely textual mode. If the parameter is set to **true** the audio feature vecto
 will be ignored and the emotion recognition task will be run on only the text
 data. If set to **false**, the *-text_model* will run multimodally and use the audio
 feature vectors for its learning.
+7. *-use_audio_model* - determines if the audio feature vectors should be taken from the audio emotion recognition model, or from the given *-audio_feature_extraction* method
 
 
 So for example if the system should be used multimodally with **LSTM** multimodal
@@ -30,10 +31,10 @@ model, **w2v** text feature method, **CNN1D** audio model, **mfcc_only** audio f
 traction on the **ECF** dataset with **FT2D** noise reduction method, the run command
 would look like this:
 
-`python main.py −text_model LSTM −text_feature_extraction w2v − audio_model CNN1D
--audio_feature_extraction mfcc_only − dataset ECF_FT2D − text_only false`
+`python main.py −text_model LSTM −text_feature_extraction w2v −audio_model CNN1D
+-audio_feature_extraction mfcc_only −dataset ECF_FT2D −text_only false -use_audio_model true`
 
-There is also the requirements.txt file that includes all the neccesary libraries
+There is also the requirements.txt file that includes all the necessary libraries
 to run the project. Libraries in use:
 `
 librosa ==0.10.2
