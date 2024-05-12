@@ -1,5 +1,5 @@
 # Multimodal Emotion Recognition System
-The main entry point of the code is the main.py script. This script expects 6 input
+The main entry point of the code is the main.py script. This script expects 7 input
 parameters.
 1. *-text_model* - determines which multimodal or textual model is supposed
 to be used. Either **LSTM** or **BERT**
