@@ -95,7 +95,7 @@ def load_IEMOCAP(feature_method, model_name):
     '''
     Loading the IEMOCAP dataset into train, test and dev datasets for the audio learning.
     '''
-    print("Loading IEMOCAP audio dataset.\n")
+    print("\nLoading IEMOCAP audio dataset.\n")
     iemocap_data = load_iemocap_structure()
     train_x = []
     train_y = []
@@ -145,6 +145,8 @@ def load_IEMOCAP(feature_method, model_name):
             train_x.append(features)
             train_y.append(y)
         counter += 1
+        if counter % (int(len(iemocap_data) / 10)) == 0:
+            print(str((counter/int(len(iemocap_data) / 10)) * 10) + "% |", end=" ")
 
     # converting list of numpy arrays of tensors into torch tensors.
     train_y = [torch.from_numpy(train_y[i]) for i in range(0, len(train_y))]
@@ -167,7 +169,7 @@ def load_RAVDESS(feature_method, model_name):
     '''
     Loading of the RAVDESS dataset. Returns train, test and dev dataset
     '''
-    print("Loading RAVDESS audio dataset.\n")
+    print("\nLoading RAVDESS audio dataset.\n")
     folders = os.listdir("RAVDESS")
     train_x = []
     train_y = []
@@ -177,6 +179,10 @@ def load_RAVDESS(feature_method, model_name):
     val_y = []
     random_indexes = []
     val_indexes = []
+    overall_length = 0
+    for f in folders:
+        files = os.listdir(RAVDESS_PATH + "/" + f)
+        overall_length += len(files)
     # spliting the dataset into train, test and dev by random indexes from the whole dataset.
     while len(random_indexes) < 200:
         index = random.randint(0, 1399)
@@ -216,6 +222,8 @@ def load_RAVDESS(feature_method, model_name):
                 train_x.append(features)
                 train_y.append(y)
             counter += 1
+            if counter % (int(overall_length / 10)) == 0:
+                print(str((counter / int(overall_length / 10)) * 10) + "% |", end=" ")
 
     # Converting the list of numpy arrays and list of tensors into torch tensors.
     train_y = [torch.from_numpy(train_y[i]) for i in range(0, len(train_y))]
@@ -258,6 +266,8 @@ def load_ECF(feature_method, model_name, dataset):
     test_y = []
     ecf_data, filtered_data = load_ecf_structure()
     # appending the data into the right dataset split. The split is given by the dataset from the audio files location.
+    overall_length = len(trains) + len(tests) + len(vals)
+    counter = 0
     for f in trains:
         key = f[3:].split("utt")[0] + "_" + f[3:].split("utt")[1].split(".")[0]
         # classification class one hot vector representation
@@ -289,6 +299,9 @@ def load_ECF(feature_method, model_name, dataset):
                 features = get_mfcconly(audio_x, sample_rate)
         train_y.append(y)
         train.append(features)
+        counter += 1
+        if counter % (int(overall_length / 10)) == 0:
+            print(str((counter / int((overall_length / 10))) * 10) + "% |", end=" ")
     for f in vals:
         key = f[3:].split("utt")[0] + "_" + f[3:].split("utt")[1].split(".")[0]
         # classification class one hot vector representation
@@ -320,6 +333,9 @@ def load_ECF(feature_method, model_name, dataset):
                 features = get_mfcconly(audio_x, sample_rate)
         val.append(features)
         val_y.append(y)
+        counter += 1
+        if counter % (int(overall_length / 10)) == 0:
+            print(str((counter / int((overall_length / 10))) * 10) + "% |", end=" ")
     for f in tests:
         key = f[3:].split("utt")[0] + "_" + f[3:].split("utt")[1].split(".")[0]
         # classification class one hot vector representation
@@ -351,6 +367,9 @@ def load_ECF(feature_method, model_name, dataset):
                 features = get_mfcconly(audio_x, sample_rate)
         test_x.append(features)
         test_y.append(y)
+        counter += 1
+        if counter % (int(overall_length / 10)) == 0:
+            print(str((counter / int((overall_length / 10))) * 10) + "% |", end=" ")
 
     # mapping all the data to torch tensors
     train, train_y, val_y, test_y, val, test_x = map(torch.tensor, [train, train_y, val_y, test_y, val, test_x])
@@ -371,12 +390,16 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
     tests = os.listdir(test_folder)
     train_x, train_y, test_x, test_y, dev_x, dev_y, train_a, test_a, dev_a = [], [], [], [], [], [], [], [], []
     # initializing the audio feature extraction model by the audio model name given in the input parameters
-    if audio_model == "CNN1D":
-        model = ConvNet(audio_features, dataset)
-    elif audio_model == "CNN2D":
-        model = CNN_small(audio_features, dataset)
-    else:
-        model = simple_NN(audio_features, dataset)
+    if use_audio_model:
+        if audio_model == "CNN1D":
+            model = ConvNet(audio_features, dataset)
+        elif audio_model == "CNN2D":
+            model = CNN_small(audio_features, dataset)
+        else:
+            model = simple_NN(audio_features, dataset)
+        saved_model_name = audio_model + "_" + dataset + "_" + audio_features + ".pt"
+        model.load_state_dict(torch.load("./audio_models/" + saved_model_name))
+        print("Weights for " + audio_model + " loaded.")
 
     # setting the number of classification classes, out of vocabulary index for the Word2vec
     # and loading the dataset data.
@@ -405,10 +428,7 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
             if index not in val_indexes and index not in random_indexes:
                 val_indexes.append(index)
 
-    saved_model_name = audio_model + "_" + dataset + "_" + audio_features + ".pt"
-    model.load_state_dict(torch.load("./audio_models/" + saved_model_name))
-    if use_audio_model:
-        print("Weights for " + audio_model + " loaded.")
+
     counter = 0
     for conv in data:
         # one hot classification classes vector
@@ -472,6 +492,8 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
                 train_x.append(sentence_embeddings)
                 train_y.append(data_y)
         counter += 1
+        if counter % (int(len(data) / 10)) == 0:
+            print(str((counter / int((len(data) / 10))) * 10) + "% |", end=" ")
 
     # Converting the list of numpy arrays or tensors into torch tensors
     train_a = torch.stack((train_a))
@@ -505,12 +527,16 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features, use_a
     tests = os.listdir(test_folder)
     train_x, train_y, test_x, test_y, dev_x, dev_y, train_a, test_a, dev_a = [], [], [], [], [], [], [], [], []
     # initializing the audio feature extraction model by the audio model name given in the input parameters
-    if audio_model == "CNN1D":
-        model = ConvNet(audio_features, dataset)
-    elif audio_model == "CNN2D":
-        model = CNN_small(audio_features, dataset)
-    else:
-        model = simple_NN(audio_features, dataset)
+    if use_audio_model:
+        if audio_model == "CNN1D":
+            model = ConvNet(audio_features, dataset)
+        elif audio_model == "CNN2D":
+            model = CNN_small(audio_features, dataset)
+        else:
+            model = simple_NN(audio_features, dataset)
+        saved_model_name = audio_model + "_" + dataset + "_" + audio_features + ".pt"
+        model.load_state_dict(torch.load("./audio_models/" + saved_model_name))
+        print("Weights for " + audio_model + " loaded.")
 
     # setting the number of classification classes and loading the dataset data.
     if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
@@ -536,10 +562,6 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features, use_a
             if index not in val_indexes and index not in random_indexes:
                 val_indexes.append(index)
 
-    saved_model_name = audio_model + "_" + dataset + "_" + audio_features + ".pt"
-    model.load_state_dict(torch.load("./audio_models/" + saved_model_name))
-    if use_audio_model:
-        print("Weights for " + audio_model + " loaded.")
     counter = 0
     for conv in data:
         # one hot classification classes vector
@@ -600,6 +622,8 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features, use_a
                 train_x.append(data_x)
                 train_y.append(data_y)
         counter += 1
+        if counter % (int(len(data) / 10)) == 0:
+            print(str((counter / int((len(data) / 10))) * 10) + "% |", end=" ")
 
     # Converting the list of numpy arrays or tensors into torch tensors
     train_a = torch.stack((train_a))
@@ -628,12 +652,16 @@ def load_data_for_bert(dataset, audio_model, audio_feature, use_audio_model):
     test_attention, dev_inputs, dev_attention, dev_labels, train_audio, test_audio, dev_audio = [], [], [], [], [], [], \
                                                                                                 [], [], [], [], [], []
     # audio feature extraction model initialization
-    if audio_model == "CNN1D":
-        model = ConvNet(audio_feature, dataset)
-    elif audio_model == "CNN2D":
-        model = CNN_small(audio_feature, dataset)
-    else:
-        model = simple_NN(audio_feature, dataset)
+    if use_audio_model:
+        if audio_model == "CNN1D":
+            model = ConvNet(audio_feature, dataset)
+        elif audio_model == "CNN2D":
+            model = CNN_small(audio_feature, dataset)
+        else:
+            model = simple_NN(audio_feature, dataset)
+        saved_model_name = audio_model + "_" + dataset + "_" + audio_feature + ".pt"
+        model.load_state_dict(torch.load("./audio_models/" + saved_model_name))
+        print("Weights for " + audio_model + " loaded.")
 
     # setting the number of classification classes, maximum sentence lengths and loading the dataset data.
     if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
@@ -661,10 +689,6 @@ def load_data_for_bert(dataset, audio_model, audio_feature, use_audio_model):
             if index not in val_indexes and index not in random_indexes:
                 val_indexes.append(index)
 
-    saved_model_name = audio_model + "_" + dataset + "_" + audio_feature + ".pt"
-    model.load_state_dict(torch.load("./audio_models/" + saved_model_name))
-    if use_audio_model:
-        print("Weights for " + audio_model + " loaded.")
     counter = 0
     max_length = 0
     for conv in data:
@@ -732,6 +756,8 @@ def load_data_for_bert(dataset, audio_model, audio_feature, use_audio_model):
                 train_attention.append(encoded_dict['attention_mask'])
                 train_labels.append(data_y)
         counter += 1
+        if counter % (int(len(data) / 10)) == 0:
+            print(str((counter / int((len(data) / 10))) * 10) + "% |", end=" ")
 
     # Converting the list of numpy arrays or tensors into torch tensors
     train_inputs = torch.cat(train_inputs, dim=0)
