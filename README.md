@@ -19,7 +19,7 @@ ferent for Linux and Windows operation systems:
   ```sudo apt install ffmpeg```
   - sox - This processing tool can be installed on Linux with the following
   command:\
-  ```sudo apt − get install sox libsox − dev```
+  ```sudo apt−get install sox libsox−dev```
 
 The main entry point of the code is the main.py script. The first input argument
 determines which modality should be used. There are 7 input arguments. Usage of
