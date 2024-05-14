@@ -370,6 +370,7 @@ if __name__ == "__main__":
     # parsing the input parameters of the script
     parser = argparse.ArgumentParser()
     parser.add_argument('-modality', required=True, type=str)
+    parser.add_argument('-text_model', required=False, type=str)
     parser.add_argument('-text_feature_extraction', required=False, type=str)
     parser.add_argument('-audio_model', required=False, type=str)
     parser.add_argument('-audio_feature_extraction', required=False, type=str)
