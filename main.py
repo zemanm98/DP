@@ -107,6 +107,7 @@ def text_training(modality, dataset, configuration):
     print("Chosen modality: " + modality + "\n")
     if modality == "audio":
         audio_emotion_learn(configuration["audio_model"], dataset, configuration["audio_features"])
+        exit(0)
     # print("Input parameters validated\nMultimodal model: " + text_model + "\nAudio model: " + audio_model +
     #       "\nText features: " + text_features + "\nAudio features: " + audio_features + "\nDataset: " + dataset + "\n")
     # print("\nText only: " + str(text_only) + "\nUse Audio Model: " + str(use_audio_model) + "\n")
