@@ -9,7 +9,7 @@ import torch
 from transformers import BertTokenizer, BertModel
 
 from config.config import *
-from models import ConvNet, LSTM, CNN_small, simple_NN
+from models import ConvNet, CNN_small, simple_NN
 from utils.feature_extraction import get_mfcconly, get_mfcconly_n_dim, get_collective_features_n_dim, \
     get_collective_features
 from utils.func import embedding_lookup
@@ -371,9 +371,7 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
     tests = os.listdir(test_folder)
     train_x, train_y, test_x, test_y, dev_x, dev_y, train_a, test_a, dev_a = [], [], [], [], [], [], [], [], []
     # initializing the audio feature extraction model by the audio model name given in the input parameters
-    if audio_model == "LSTM":
-        model = LSTM(audio_features, dataset)
-    elif audio_model == "CNN1D":
+    if audio_model == "CNN1D":
         model = ConvNet(audio_features, dataset)
     elif audio_model == "CNN2D":
         model = CNN_small(audio_features, dataset)
@@ -438,7 +436,7 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
                 x_input = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
                 out1, out2 = model(x_input.float())
                 out2 = out2.squeeze()
-                audio_vector = out2.detach().numpy()
+                audio_vector = out2.detach()
             else:
                 audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
             if file_name in trains:
@@ -458,7 +456,7 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
                 x_input = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
                 out1, out2 = model(x_input.float())
                 out2 = out2.squeeze()
-                audio_vector = out2.detach().numpy()
+                audio_vector = out2.detach()
             else:
                 audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
             if counter in random_indexes:
@@ -507,9 +505,7 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features, use_a
     tests = os.listdir(test_folder)
     train_x, train_y, test_x, test_y, dev_x, dev_y, train_a, test_a, dev_a = [], [], [], [], [], [], [], [], []
     # initializing the audio feature extraction model by the audio model name given in the input parameters
-    if audio_model == "LSTM":
-        model = LSTM(audio_features, dataset)
-    elif audio_model == "CNN1D":
+    if audio_model == "CNN1D":
         model = ConvNet(audio_features, dataset)
     elif audio_model == "CNN2D":
         model = CNN_small(audio_features, dataset)
@@ -632,9 +628,7 @@ def load_data_for_bert(dataset, audio_model, audio_feature, use_audio_model):
     test_attention, dev_inputs, dev_attention, dev_labels, train_audio, test_audio, dev_audio = [], [], [], [], [], [], \
                                                                                                 [], [], [], [], [], []
     # audio feature extraction model initialization
-    if audio_model == "LSTM":
-        model = LSTM(audio_feature, dataset)
-    elif audio_model == "CNN1D":
+    if audio_model == "CNN1D":
         model = ConvNet(audio_feature, dataset)
     elif audio_model == "CNN2D":
         model = CNN_small(audio_feature, dataset)
@@ -902,7 +896,7 @@ def get_audio_vector(audio_feature, model_name, filename, dataset, use_audio_mod
             # reshaping the dimensions for the audio model
             if model_name == "CNN2D":
                 x_input = x_input[None, None, :, :]
-            elif model_name == "CNN1D" or model_name == "LSTM":
+            elif model_name == "CNN1D":
                 x_input = x_input[None, None, :]
             else:
                 x_input = x_input[None, :]
@@ -929,7 +923,7 @@ def get_audio_vector(audio_feature, model_name, filename, dataset, use_audio_mod
             # reshaping the dimensions for the audio model
             if model_name == "CNN2D":
                 x_input = x_input[None, None, :, :]
-            elif model_name == "CNN1D" or model_name == "LSTM":
+            elif model_name == "CNN1D":
                 x_input = x_input[None, None, :]
             else:
                 x_input = x_input[None, :]

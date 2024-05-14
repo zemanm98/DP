@@ -2,38 +2,6 @@ import torch
 from torch.nn import functional as F
 from transformers import AutoConfig, AutoModel
 
-'''
-LSTM audio emotion recognition model
-'''
-class LSTM(torch.nn.Module):
-    def __init__(self, feature_method, dataset):
-        super(LSTM, self).__init__()
-        # input size of the first LSTM layer depends on the feature extaction method used.
-        if feature_method == "collective_features":
-            self.bilstm = torch.nn.LSTM(312, 300, batch_first=True, bidirectional=True)
-        else:
-            self.bilstm = torch.nn.LSTM(50, 300, batch_first=True, bidirectional=True)
-        self.dp = torch.nn.Dropout(p=0.3)
-        self.linear = torch.nn.Linear(600, 50)
-        self.relu = torch.nn.ReLU()
-        # depending on the dataset used the output classification vector has different size
-        if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
-            self.linear2 = torch.nn.Linear(50, 7)
-        elif dataset == "RAVDESS":
-            self.linear2 = torch.nn.Linear(50, 8)
-        else:
-            self.linear2 = torch.nn.Linear(50, 5)
-
-    def forward(self, x):
-        x_states, hidden_states = self.bilstm(x)
-        x = x_states.squeeze()
-        x = self.dp(x)
-        x_out = self.linear(x)
-        x = self.relu(x_out)
-        x = self.linear2(x)
-        x = F.softmax(x)
-        return x, x_out
-
 
 '''
 CNN1D audio emotion recognition model

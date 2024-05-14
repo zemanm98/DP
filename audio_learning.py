@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from config.config import *
 import argparse
 from dataset_loading import load_ECF, load_RAVDESS, load_IEMOCAP
-from models import LSTM, ConvNet, CNN_small, simple_NN
+from models import ConvNet, CNN_small, simple_NN
 from utils.func import f1_acc
 import os
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -17,8 +17,6 @@ def initialize_model(model_name, feature_method, dataset):
         model = ConvNet(feature_method, dataset)
     elif model_name == "CNN2D":
         model = CNN_small(feature_method, dataset)
-    elif model_name == "LSTM":
-        model = LSTM(feature_method, dataset)
     else:
         model = simple_NN(feature_method, dataset)
 
@@ -32,14 +30,14 @@ def initialize_train_tensors(model_name, feature_method, dataset):
     if feature_method == "collective_features":
         if model_name == "CNN2D":
             train_x_batch = torch.empty((0, 1, 300, 202), dtype=torch.float32)
-        elif model_name == "NN":
+        elif model_name == "MLP":
             train_x_batch = torch.empty((0, 312), dtype=torch.float32)
         else:
             train_x_batch = torch.empty((0, 1, 312), dtype=torch.float32)
     else:
         if model_name == "CNN2D":
             train_x_batch = torch.empty((0, 1, 300, 50), dtype=torch.float32)
-        elif model_name == "NN":
+        elif model_name == "MLP":
             train_x_batch = torch.empty((0, 50), dtype=torch.float32)
         else:
             train_x_batch = torch.empty((0, 1, 50), dtype=torch.float32)
@@ -113,7 +111,7 @@ def audio_emotion_learn(model_name, dataset, feature_extraction):
             # transforming the batch dimensions to model dimensions
             if model_name == "CNN2D":
                 tr_x_batch = tr_x_batch[:, None, :, :]
-            elif model_name == "CNN1D" or model_name == "LSTM":
+            elif model_name == "CNN1D":
                 tr_x_batch = tr_x_batch[:, None, :]
             else:
                 train_x_batch = train_x_batch

@@ -36,8 +36,8 @@ def validate_input(text_model, audio_model, text_features, audio_features, datas
         print("Unknown text feature extraction method.\nText feature extraction method choices are: w2v or bert\n")
         exit(0)
 
-    if audio_model not in ["CNN1D", "CNN2D", "NN", "LSTM"]:
-        print("Unknown audio model. Audio model choices are: CNN1D or CNN2D or NN or LSTM\n")
+    if audio_model not in ["CNN1D", "CNN2D", "MLP"]:
+        print("Unknown audio model. Audio model choices are: CNN1D or CNN2D or MLP \n")
         exit(0)
 
     if text_model not in ["BERT", "LSTM"]:
