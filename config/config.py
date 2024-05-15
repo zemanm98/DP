@@ -18,19 +18,24 @@ CNN2D_BATCH_SIZE = 32
 NN_LR = 0.0001
 NN_BATCH_SIZE = 32
 
+#Number of Epochs for training
+AUDIO_EPOCHS = 100
+TEXT_AND_MULTIMODAL_EPOCHS_LSTM = 50
+TEXT_AND_MULTIMODAL_EPOCHS_BERT = 3
+
 # ECF dataset files path
-ECF_TRAIN_FOLDER = "C:\\Users\\zeman\\PycharmProjects\\DP\\train"
-ECF_TEST_FOLDER = "C:\\Users\\zeman\\PycharmProjects\\DP\\test"
-ECF_DEV_FOLDER = "C:\\Users\\zeman\\PycharmProjects\\DP\\val"
-ECF_TEXT_JSON_PATH = "C:\\Users\\zeman\\PycharmProjects\\DP\\data\\Subtask_2_2_train.json"
+ECF_TRAIN_FOLDER = ".\\data\\train"
+ECF_TEST_FOLDER = ".\\data\\test"
+ECF_DEV_FOLDER = ".\\data\\val"
+ECF_TEXT_JSON_PATH = ".\\data\\Subtask_2_2_train.json"
 
 # IEMOCAP dataset files path
-IEMOCAP_TRANSCRIPTIONS_FODER = "C:\\Users\\zeman\\PycharmProjects\\DP\\IEMOCAP\\transcription"
-IEMOCAP_EMOTIONS_FOLDER = "C:\\Users\\zeman\\PycharmProjects\\DP\\IEMOCAP\\emotions"
-IEMOCAP_AUDIO_FOLDER = "C:\\Users\\zeman\\PycharmProjects\\DP\\IEMOCAP\\audio"
+IEMOCAP_TRANSCRIPTIONS_FODER = ".\\data\\IEMOCAP\\transcription"
+IEMOCAP_EMOTIONS_FOLDER = ".\\data\\IEMOCAP\\emotions"
+IEMOCAP_AUDIO_FOLDER = ".\\data\\IEMOCAP\\audio"
 
 # RAVDESS dataset files path
-RAVDESS_PATH = "C:\\Users\\zeman\\PycharmProjects\\DP\\RAVDESS"
+RAVDESS_PATH = ".\\data\\RAVDESS"
 
 # Word2Vec embeddings file
-W2V_FILE_PATH = "C:\\Users\\zeman\\PycharmProjects\\DP\\w2v\\model.txt"
+W2V_FILE_PATH = ".\\data\\w2v\\model.txt"

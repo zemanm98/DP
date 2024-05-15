@@ -100,7 +100,7 @@ def audio_emotion_learn(model_name, dataset, feature_extraction):
     loader = DataLoader(list(zip(train_x, train_y)), shuffle=True, batch_size=config["batch_size"])
     train_step_counter = 1
     test_step_counter = 1
-    for epoch in range(1, 100):
+    for epoch in range(1, AUDIO_EPOCHS):
         counter = 0
         model.train()
 

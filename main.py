@@ -49,7 +49,7 @@ def validate_input(args):
             exit(0)
         if args.dataset == "ECF_FT2D" or args.dataset == "ECF_REPETSIM":
             print("The noise reduction method " + args.dataset[4:] + " is used for the audio feature extraction that is"
-                  "not used in text modality.\nECF dataset will be used.\n")
+                                                                     "not used in text modality.\nECF dataset will be used.\n")
         if args.text_model not in ["BERT", "LSTM"]:
             print("Unknown text model. Text model choices are: BERT or LSTM\n")
             exit(0)
@@ -59,11 +59,13 @@ def validate_input(args):
         if args.text_model == "BERT" and args.text_feature_extraction == "w2v":
             print("BERT model is not capable of working with w2v feature extraction."
                   "BERT text feature extraction will be used.\n")
-        return {"text_model": args.text_model, "text_features": args.text_feature_extraction}
+        return {"text_model": args.text_model, "text_features": args.text_feature_extraction, "audio_model": None,
+                "audio_features": None, "use_audio_model": False}
     if args.modality == "multimodal":
         if args.audio_feature_extraction is None or args.text_model is None or args.text_feature_extraction is None or args.use_audio_model is None:
-            print("When multimodal modality is chosen, arguments -text_model, -text_feature_extraction, -use_audio_model and "
-                  "-audio_feature_extraction needs to be specified.\n")
+            print(
+                "When multimodal modality is chosen, arguments -text_model, -text_feature_extraction, -use_audio_model and "
+                "-audio_feature_extraction needs to be specified.\n")
             exit(0)
 
         use_audio_model = args.use_audio_model
@@ -91,7 +93,7 @@ def validate_input(args):
         if args.text_model == "BERT" and args.text_feature_extraction == "w2v":
             print("BERT model is not capable of working with w2v feature extraction."
                   "BERT text feature extraction will be used.\n")
-        if args.audio_model not in ["CNN1D", "CNN2D", "MLP"]:
+        if args.audio_model is not None and args.audio_model not in ["CNN1D", "CNN2D", "MLP"]:
             print("Unknown audio model. Audio model choices are: CNN1D or CNN2D or MLP \n")
             exit(0)
         if args.audio_feature_extraction not in ["collective_features", "mfcc_only"]:
@@ -108,11 +110,6 @@ def text_training(modality, dataset, configuration):
     if modality == "audio":
         audio_emotion_learn(configuration["audio_model"], dataset, configuration["audio_features"])
         exit(0)
-    # print("Input parameters validated\nMultimodal model: " + text_model + "\nAudio model: " + audio_model +
-    #       "\nText features: " + text_features + "\nAudio features: " + audio_features + "\nDataset: " + dataset + "\n")
-    # print("\nText only: " + str(text_only) + "\nUse Audio Model: " + str(use_audio_model) + "\n")
-    # # The RAVDESS dataset does not have a text transcription so only audio learning is employed
-    # if dataset == "RAVDESS" and not text_only and use_audio_model:
     if modality == "text":
         if configuration["text_model"] == "LSTM":
             train_LSTM(modality, dataset, configuration)
@@ -132,7 +129,8 @@ def train_LSTM(modality, dataset, configuration):
         model = LSTM_text_emotions(dataset, configuration["text_features"], False, configuration["use_audio_model"],
                                    configuration["audio_features"])
         if configuration["use_audio_model"]:
-            audio_model_name = configuration["audio_model"] + "_" + dataset + "_" + configuration["audio_features"] + ".pt"
+            audio_model_name = configuration["audio_model"] + "_" + dataset + "_" + configuration[
+                "audio_features"] + ".pt"
             # if the audio feature extraction model does not exist, train it first
             if not os.path.isfile("audio_models/" + audio_model_name) and configuration["use_audio_model"]:
                 print("Audio model save point not found. Audio model learning process begun.\n")
@@ -144,10 +142,12 @@ def train_LSTM(modality, dataset, configuration):
         word_embedding = torch.from_numpy(word_embedding)
         train_x, train_y, test_x, test_y, dev_x, dev_y, train_audio, test_audio, dev_audio = load_text_data(
             word_id_mapping, word_embedding,
-            30, dataset, configuration["audio_model"], configuration["audio_features"], configuration["use_audio_model"])
+            30, dataset, configuration["audio_model"], configuration["audio_features"],
+            configuration["use_audio_model"])
     else:
-        train_x, train_y, test_x, test_y, dev_x, dev_y, train_audio, test_audio, dev_audio =\
-            load_text_data_bert(30, dataset, configuration["audio_model"], configuration["audio_features"], configuration["use_audio_model"])
+        train_x, train_y, test_x, test_y, dev_x, dev_y, train_audio, test_audio, dev_audio = \
+            load_text_data_bert(30, dataset, configuration["audio_model"], configuration["audio_features"],
+                                configuration["use_audio_model"])
 
     # train evaluation step interval for the wandb logging
     if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
@@ -164,7 +164,7 @@ def train_LSTM(modality, dataset, configuration):
     tr_test_batch_a = None
     train_step_counter = 1
     test_step_counter = 1
-    for epoch in range(1, 50):
+    for epoch in range(1, TEXT_AND_MULTIMODAL_EPOCHS_LSTM):
         model.train()
         counter = 0
         for tr_x_batch, tr_y_batch, tr_batch_audio in loader:
@@ -209,17 +209,19 @@ def train_LSTM(modality, dataset, configuration):
         f1, acc = f1_acc(test_pred_y, test_y, dataset)
         print("\ntest acc: " + str(acc) + "\ntest f1: " + str(f1) + "\n")
 
-    if not os.path.exists("./text_models"):
-        os.makedirs("./text_models")
     if modality == "text":
+        if not os.path.exists("./text_models"):
+            os.makedirs("./text_models")
         torch.save(model.state_dict(), "text_models/LSTM_" + dataset + "_" + configuration[
             "text_features"] + ".pt")
     else:
+        if not os.path.exists("./multimodal_models"):
+            os.makedirs("./multimodal_models")
         if configuration["use_audio_model"]:
-            torch.save(model.state_dict(), "text_models/LSTM_" + dataset + "_" + configuration["text_features"] +
+            torch.save(model.state_dict(), "multimodal_models/LSTM_" + dataset + "_" + configuration["text_features"] +
                        "_" + configuration["audio_model"] + "_" + configuration["audio_features"] + ".pt")
         else:
-            torch.save(model.state_dict(), "text_models/LSTM_" + dataset + "_" + configuration["text_features"] +
+            torch.save(model.state_dict(), "multimodal_models/LSTM_" + dataset + "_" + configuration["text_features"] +
                        "_" + configuration["audio_features"] + ".pt")
 
 
@@ -229,7 +231,8 @@ def train_bert(modality, dataset, configuration):
     else:
         custom_model = CustomBert(dataset, False, configuration["use_audio_model"], configuration["audio_features"])
         if configuration["use_audio_model"]:
-            audio_model_name = configuration["audio_model"] + "_" + dataset + "_" + configuration["audio_features"] + ".pt"
+            audio_model_name = configuration["audio_model"] + "_" + dataset + "_" + configuration[
+                "audio_features"] + ".pt"
             # if the audio feature extraction model does not exist, train it first
             if not os.path.isfile("audio_models/" + audio_model_name) and configuration["use_audio_model"]:
                 print("Audio model save point not found. Audio model learning process begun.\n")
@@ -237,10 +240,11 @@ def train_bert(modality, dataset, configuration):
 
     # loading the dataset data for the BERT model
     train_inputs, train_attention, train_labels, test_inputs, test_labels, \
-    test_attention, dev_inputs, dev_attention, dev_labels, train_audio, test_audio, dev_audio = load_data_for_bert(dataset,
-                                                                                                                   configuration["audio_model"],
-                                                                                                                   configuration["audio_features"],
-                                                                                                                   configuration["use_audio_model"])
+    test_attention, dev_inputs, dev_attention, dev_labels, train_audio, test_audio, dev_audio = load_data_for_bert(
+        dataset,
+        configuration["audio_model"],
+        configuration["audio_features"],
+        configuration["use_audio_model"])
     train_dataset = TensorDataset(train_inputs, train_attention, train_labels, train_audio)
     test_dataset = TensorDataset(test_inputs, test_attention, test_labels, test_audio)
     dev_dataset = TensorDataset(dev_inputs, dev_attention, dev_labels, dev_audio)
@@ -251,7 +255,7 @@ def train_bert(modality, dataset, configuration):
     custom_model.to(device)
     optimizer = torch.optim.AdamW(custom_model.parameters(), lr=BERT_LR, eps=1e-8)
     loss_f = torch.nn.MSELoss()
-    epochs = 3
+    epochs = TEXT_AND_MULTIMODAL_EPOCHS_BERT
     total_steps = len(loader) * epochs
     scheduler = get_linear_schedule_with_warmup(optimizer,
                                                 num_warmup_steps=0,  # Default value in run_glue.py
@@ -297,7 +301,8 @@ def train_bert(modality, dataset, configuration):
             counter += 1
             if counter % train_eval_step == 0:
                 custom_model.eval()
-                train_test_dataset = TensorDataset(train_test_inputs, train_test_att, train_test_labels, train_test_audio)
+                train_test_dataset = TensorDataset(train_test_inputs, train_test_att, train_test_labels,
+                                                   train_test_audio)
                 train_test_loader = DataLoader(train_test_dataset, shuffle=True, batch_size=BERT_BATCH_SIZE)
                 total_eval_accuracy = 0
                 total_eval_f1 = 0
@@ -355,16 +360,20 @@ def train_bert(modality, dataset, configuration):
     avg_val_accuracy = total_eval_accuracy / len(test_loader)
     avg_val_f1 = total_eval_f1 / len(test_loader)
     print("test acc: " + str(avg_val_accuracy) + "\n test f1: " + str(avg_val_f1) + "\n")
-    if not os.path.exists("./text_models"):
-        os.makedirs("./text_models")
+
     if modality == "text":
+        if not os.path.exists("./text_models"):
+            os.makedirs("./text_models")
         torch.save(custom_model.state_dict(), "text_models/BERT_" + dataset + ".pt")
     else:
+        if not os.path.exists("./multimodal_models"):
+            os.makedirs("./multimodal_models")
         if configuration["use_audio_model"]:
-            torch.save(custom_model.state_dict(), "text_models/BERT_" + dataset + "_" + configuration["audio_model"] +
+            torch.save(custom_model.state_dict(), "multimodal_models/BERT_" + dataset + "_" + configuration["audio_model"] +
                        "_" + configuration["audio_features"] + ".pt")
         else:
-            torch.save(custom_model.state_dict(), "text_models/BERT_" + dataset + "_" + configuration["audio_features"] + ".pt")
+            torch.save(custom_model.state_dict(),
+                       "multimodal_models/BERT_" + dataset + "_" + configuration["audio_features"] + ".pt")
 
 
 if __name__ == "__main__":

@@ -64,9 +64,9 @@ def load_iemocap_structure():
     '''
     iemocap_emotion_exclude = ["hap", "xxx", "oth", "fea", "sur", "dis"]
     text_transcriptions = {}
-    transcriptions = os.listdir(IEMOCAP_TRANSCRIPTIONS_FODER)
+    transcriptions = os.listdir(IEMOCAP_TRANSCRIPTIONS_FOLDER)
     for f in transcriptions:
-        transcription = open(IEMOCAP_TRANSCRIPTIONS_FODER + "/" + f).readlines()
+        transcription = open(IEMOCAP_TRANSCRIPTIONS_FOLDER + "/" + f).readlines()
         for line in transcription:
             inf = line.split(":")
             if inf[0] not in text_transcriptions:
@@ -106,12 +106,12 @@ def load_IEMOCAP(feature_method, model_name):
     random_indexes = []
     val_indexes = []
     # dividing the IEMOCAP dataset into train, test dev by random indexes from whole dataset
-    while len(random_indexes) < 1000:
-        index = random.randint(0, 6784)
+    while len(random_indexes) < int(len(iemocap_data) * 0.15):
+        index = random.randint(0, (len(iemocap_data) - 1))
         if index not in random_indexes:
             random_indexes.append(index)
-    while len(val_indexes) < 1000:
-        index = random.randint(0, 6784)
+    while len(val_indexes) < int(len(iemocap_data) * 0.15):
+        index = random.randint(0, (len(iemocap_data) - 1))
         if index not in val_indexes and index not in random_indexes:
             val_indexes.append(index)
     counter = 0
@@ -170,7 +170,7 @@ def load_RAVDESS(feature_method, model_name):
     Loading of the RAVDESS dataset. Returns train, test and dev dataset
     '''
     print("\nLoading RAVDESS audio dataset.\n")
-    folders = os.listdir("RAVDESS")
+    folders = os.listdir(RAVDESS_PATH)
     train_x = []
     train_y = []
     test_x = []
@@ -184,12 +184,12 @@ def load_RAVDESS(feature_method, model_name):
         files = os.listdir(RAVDESS_PATH + "/" + f)
         overall_length += len(files)
     # spliting the dataset into train, test and dev by random indexes from the whole dataset.
-    while len(random_indexes) < 200:
-        index = random.randint(0, 1399)
+    while len(random_indexes) < int(overall_length * 0.15):
+        index = random.randint(0, (overall_length - 1))
         if index not in random_indexes:
             random_indexes.append(index)
-    while len(val_indexes) < 200:
-        index = random.randint(0, 1399)
+    while len(val_indexes) < int(overall_length * 0.15):
+        index = random.randint(0, (overall_length - 1))
         if index not in val_indexes and index not in random_indexes:
             val_indexes.append(index)
     counter = 0
@@ -405,7 +405,7 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
     # and loading the dataset data.
     if dataset == "ECF" or dataset == "ECF_FT2D" or dataset == "ECF_REPETSIM":
         n_class = 7
-        out_vocab = 6434
+        out_vocab = len(word_idx) + 1
         data = []
         ecf_data, filtered_data = load_ecf_structure()
         for conv in ecf_data:
@@ -414,17 +414,17 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
                     {"filename": sent["video_name"][:-3] + "wav", "emotion": sent["emotion"], "text": sent["text"]})
     else:
         n_class = 5
-        out_vocab = 6338
+        out_vocab = len(word_idx) + 1
         data = load_iemocap_structure()
         random_indexes = []
         val_indexes = []
         # preparing the indexes for the IEMOCAP dataset train/test/dev split
-        while len(random_indexes) < 1130:
-            index = random.randint(0, 7531)
+        while len(random_indexes) < int(len(data) * 0.15):
+            index = random.randint(0, (len(data) - 1))
             if index not in random_indexes:
                 random_indexes.append(index)
-        while len(val_indexes) < 1130:
-            index = random.randint(0, 7531)
+        while len(val_indexes) < int(len(data) * 0.15):
+            index = random.randint(0, (len(data) - 1))
             if index not in val_indexes and index not in random_indexes:
                 val_indexes.append(index)
 
@@ -458,7 +458,10 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
                 out2 = out2.squeeze()
                 audio_vector = out2.detach()
             else:
-                audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
+                if audio_features is not None:
+                    audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
+                else:
+                    audio_vector = torch.empty((50))
             if file_name in trains:
                 train_a.append(audio_vector)
                 train_x.append(sentence_embeddings)
@@ -478,7 +481,10 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
                 out2 = out2.squeeze()
                 audio_vector = out2.detach()
             else:
-                audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
+                if audio_features is not None:
+                    audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
+                else:
+                    audio_vector = torch.empty((50))
             if counter in random_indexes:
                 test_x.append(sentence_embeddings)
                 test_y.append(data_y)
@@ -495,6 +501,7 @@ def load_text_data(word_idx, word_embed, max_sen_len, dataset, audio_model, audi
         if counter % (int(len(data) / 10)) == 0:
             print(str((counter / int((len(data) / 10))) * 10) + "% |", end=" ")
 
+    print("\n")
     # Converting the list of numpy arrays or tensors into torch tensors
     train_a = torch.stack((train_a))
     test_a = torch.stack((test_a))
@@ -553,12 +560,12 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features, use_a
         random_indexes = []
         val_indexes = []
         # preparing the indexes for the IEMOCAP dataset train/test/dev split
-        while len(random_indexes) < 1130:
-            index = random.randint(0, 7531)
+        while len(random_indexes) < int(len(data) * 0.15):
+            index = random.randint(0, (len(data) - 1))
             if index not in random_indexes:
                 random_indexes.append(index)
-        while len(val_indexes) < 1130:
-            index = random.randint(0, 7531)
+        while len(val_indexes) < int(len(data) * 0.15):
+            index = random.randint(0, (len(data) - 1))
             if index not in val_indexes and index not in random_indexes:
                 val_indexes.append(index)
 
@@ -588,7 +595,11 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features, use_a
                 out2 = out2.squeeze()
                 audio_vector = out2.detach()
             else:
-                audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
+                if audio_features is not None:
+                    audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
+                else:
+                    audio_vector = torch.empty((50))
+
             if file_name in trains:
                 train_a.append(audio_vector)
                 train_x.append(data_x)
@@ -608,7 +619,10 @@ def load_text_data_bert(max_sen_len, dataset, audio_model, audio_features, use_a
                 out2 = out2.squeeze()
                 audio_vector = out2.detach()
             else:
-                audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
+                if audio_features is not None:
+                    audio_vector = get_audio_vector(audio_features, audio_model, file_name, dataset, use_audio_model)
+                else:
+                    audio_vector = torch.empty((50))
             if counter in random_indexes:
                 test_x.append(data_x)
                 test_y.append(data_y)
@@ -680,12 +694,12 @@ def load_data_for_bert(dataset, audio_model, audio_feature, use_audio_model):
         random_indexes = []
         val_indexes = []
         # preparing the indexes for the IEMOCAP dataset train/test/dev split
-        while len(random_indexes) < 1130:
-            index = random.randint(0, 7531)
+        while len(random_indexes) < int(len(data) * 0.15):
+            index = random.randint(0, (len(data) - 1))
             if index not in random_indexes:
                 random_indexes.append(index)
-        while len(val_indexes) < 1130:
-            index = random.randint(0, 7531)
+        while len(val_indexes) < int(len(data) * 0.15):
+            index = random.randint(0, (len(data) - 1))
             if index not in val_indexes and index not in random_indexes:
                 val_indexes.append(index)
 
@@ -716,7 +730,10 @@ def load_data_for_bert(dataset, audio_model, audio_feature, use_audio_model):
                 out2 = out2.squeeze()
                 audio_vector = out2.detach()
             else:
-                audio_vector = get_audio_vector(audio_feature, audio_model, file_name, dataset, use_audio_model)
+                if audio_feature is not None:
+                    audio_vector = get_audio_vector(audio_feature, audio_model, file_name, dataset, use_audio_model)
+                else:
+                    audio_vector = torch.empty((50))
             if file_name in trains:
                 train_audio.append(audio_vector)
                 train_inputs.append(encoded_dict['input_ids'])
@@ -739,7 +756,10 @@ def load_data_for_bert(dataset, audio_model, audio_feature, use_audio_model):
                 out2 = out2.squeeze()
                 audio_vector = out2.detach()
             else:
-                audio_vector = get_audio_vector(audio_feature, audio_model, file_name, dataset, use_audio_model)
+                if audio_feature is not None:
+                    audio_vector = get_audio_vector(audio_feature, audio_model, file_name, dataset, use_audio_model)
+                else:
+                    audio_vector = torch.empty((50))
             if counter in random_indexes:
                 test_audio.append(audio_vector)
                 test_inputs.append(encoded_dict['input_ids'])
